@@ -1,5 +1,24 @@
-# refer to
+# Refer to:
+# https://towardsdatascience.com/solving-lunar-lander-openaigym-reinforcement-learning-785675066197
 # https://pytorch.org/docs/stable/distributions.html
+# check 8 states and 4 actions at ./gym/envs/box2d/lunar_lander.py
+# python3 ./keyboard_agent.py LunarLander-v2 #play use key 1,2,3
+'''The Scenario
+s[0] is the horizontal coordinate
+s[1] is the vertical coordinate
+s[2] is the horizontal speed
+s[3] is the vertical speed
+s[4] is the angle
+s[5] is the angular speed
+s[6] 1 if first leg has contact
+s[7] 1 if second leg has contact
+The 8 elements present to one state
+When those elements happened we need do one action and get the highest rewards
+key 1 - main engine
+key 2 - left engine
+key 3 - right engine
+key 4 - nope'''
+
 import torch
 import torch.nn as nn
 import torch.distributions
@@ -47,12 +66,12 @@ class Actor_Critic(nn.Module):
     def interact(self, estates, gamedata):
         tstates         = torch.from_numpy(estates).float().to(device)
         action_probs    = self.network_act(tstates)
-        dist            = torch.distributions.Categorical(action_probs)
-        action          = dist.sample()
+        distribute      = torch.distributions.Categorical(action_probs)
+        action          = distribute.sample()
         
         gamedata.states.append(tstates)
         gamedata.actions.append(action)
-        gamedata.logprobs.append(dist.log_prob(action))
+        gamedata.logprobs.append(distribute.log_prob(action))
         
         return action.item()
     
