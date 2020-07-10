@@ -6,17 +6,17 @@ Gym main source: https://github.com/openai/gym/tree/master/gym
 Integrated PPO and Gym source
 modify some crash problem with weight and float
 
-preinstall 
-1. python3 version >=3.7
-refer to 
+Preinstall
+1.python3 version >=3.7
+refer to
 
 https://fatalfeel.blogspot.com/2019/12/ai-with-cuda-install-step-and-yolov3-in.html
 
-2. pytorch package
+2.pytorch package
 
 https://pytorch.org
 
-3. box2d
+3.box2d package
 pip3 install box2d
 
 PPO Lessons
