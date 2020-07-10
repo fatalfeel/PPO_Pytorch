@@ -35,10 +35,10 @@ if __name__ == '__main__':
 
     for ep in range(1, n_episodes+1):
         ep_reward = 0
-        state = env.reset()
+        estates = env.reset()
         for t in range(max_timesteps):
-            action = ppo.select_action(state, gamedata)
-            state, reward, done, _ = env.step(action)
+            action = ppo.select_action(estates, gamedata)
+            estates, reward, done, _ = env.step(action)
             ep_reward += reward
             if render:
                 env.render()
