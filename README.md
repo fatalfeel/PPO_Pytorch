@@ -1,10 +1,9 @@
 # PPO-PyTorch
 PPO main source: https://github.com/nikhilbarhate99/PPO-PyTorch
-
 Gym main source: https://github.com/openai/gym/tree/master/gym
 
 Integrated PPO and Gym source
-modify some crash weight and float problem
+modify some crash problem with weight and float
 
 preinstall 
 1. python3 version >=3.7
