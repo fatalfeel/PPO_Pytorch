@@ -43,7 +43,7 @@ class Actor_Critic(nn.Module):
         raise NotImplementedError
         
     def interact(self, estates, gamedata):
-        tstates        = torch.from_numpy(estates).float().to(device)
+        tstates         = torch.from_numpy(estates).float().to(device)
         action_probs    = self.network_act(tstates)
         dist            = torch.distributions.Categorical(action_probs)
         action          = dist.sample()
