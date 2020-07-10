@@ -43,7 +43,8 @@ class Actor_Critic(nn.Module):
     def forward(self):
         raise NotImplementedError
     
-    def interact(self, tstates, gamedata):
+    def interact(self, estates, gamedata):
+        tstates         = torch.FloatTensor(estates.reshape(1, -1)).to(device)
         action_mean     = self.network_act(tstates)
         cov_mat         = torch.diag(self.action_var).to(device)
         dist            = torch.distributions.MultivariateNormal(action_mean, cov_mat)
@@ -53,9 +54,9 @@ class Actor_Critic(nn.Module):
         gamedata.states.append(tstates)
         gamedata.actions.append(action)
         gamedata.logprobs.append(action_logprob)
-        
-        return action.detach()
-    
+
+        return action.detach().cpu().data.numpy().flatten()
+
     def calculation(self, states, actions):
         action_mean     = self.network_act(states)
         action_var      = self.action_var.expand_as(action_mean)
@@ -84,9 +85,9 @@ class CPPO:
         
         self.MseLoss = nn.MSELoss()
     
-    def select_action(self, estates, gamedata):
-        tstates = torch.FloatTensor(estates.reshape(1, -1)).to(device)
-        return self.policy_old.interact(tstates, gamedata).cpu().data.numpy().flatten()
+    #def select_action(self, estates, gamedata):
+    #    tstates = torch.FloatTensor(estates.reshape(1, -1)).to(device)
+    #    return self.policy_old.interact(tstates, gamedata).cpu().data.numpy().flatten()
     
     def train_update(self, gamedata):
         # Monte Carlo estimate of rewards:
@@ -172,7 +173,8 @@ if __name__ == '__main__':
         for t in range(max_timesteps):
             time_step +=1
             # Running policy_old:
-            action = ppo.select_action(estates, gamedata)
+            #action = ppo.select_action(estates, gamedata)
+            action = ppo.policy_old.interact(estates, gamedata)
             estates, reward, done, _ = env.step(action)
             
             # Saving reward and is_terminals:

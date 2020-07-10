@@ -37,7 +37,8 @@ if __name__ == '__main__':
         ep_reward = 0
         estates = env.reset()
         for t in range(max_timesteps):
-            action = ppo.select_action(estates, gamedata)
+            #action = ppo.select_action(estates, gamedata)
+            action = ppo.policy_old.interact(estates, gamedata)
             estates, reward, done, _ = env.step(action)
             ep_reward += reward
             if render:
