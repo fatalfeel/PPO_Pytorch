@@ -120,7 +120,7 @@ class CPPO:
 
 if __name__ == '__main__':
     ############## Hyperparameters ##############
-    env_name = "LunarLander-v2"
+    env_name        = "LunarLander-v2"
     # creating environment
     render          = False
     solved_reward   = 230           # stop training if reach avg_reward > solved_reward
@@ -138,9 +138,9 @@ if __name__ == '__main__':
     #############################################
 
     # creating environment
-    env             = gym.make(env_name)
-    dim_states = env.observation_space.shape[0]  # LunarLander give 8 states
-    dim_acts        = 4  # 4 action directions
+    env         = gym.make(env_name)
+    dim_states  = env.observation_space.shape[0]  # LunarLander give 8 states
+    dim_acts    = 4  # 4 action directions
 
     if random_seed:
         torch.manual_seed(random_seed)
@@ -156,14 +156,14 @@ if __name__ == '__main__':
 
     # training loop
     for i_episode in range(1, max_episodes+1):
-        state = env.reset() #init state value to matrix
+        estates = env.reset() #init state value to matrix
 
         for t in range(max_timesteps):
             timestep += 1
 
             # Running policy_old:
-            action = ppo.policy_old.interact(state, gamedata)
-            state, reward, done, _ = env.step(action)
+            action = ppo.policy_old.interact(estates, gamedata)
+            estates, reward, done, _ = env.step(action)
 
             # Saving reward and is_terminal:
             gamedata.rewards.append(reward)

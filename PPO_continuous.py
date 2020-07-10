@@ -169,12 +169,12 @@ if __name__ == '__main__':
     
     # training loop
     for i_episode in range(1, max_episodes+1):
-        state = env.reset()
+        estates = env.reset()
         for t in range(max_timesteps):
             time_step +=1
             # Running policy_old:
-            action = ppo.select_action(state, gamedata)
-            state, reward, done, _ = env.step(action)
+            action = ppo.select_action(estates, gamedata)
+            estates, reward, done, _ = env.step(action)
             
             # Saving reward and is_terminals:
             gamedata.rewards.append(reward)
