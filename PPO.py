@@ -157,7 +157,6 @@ if __name__ == '__main__':
     # training loop
     for i_episode in range(1, max_episodes+1):
         estates = env.reset() #init state value to matrix
-
         for t in range(max_timesteps):
             timestep += 1
 
