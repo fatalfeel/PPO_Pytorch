@@ -1,3 +1,5 @@
+# refer to
+# https://pytorch.org/docs/stable/distributions.html
 import torch
 import torch.nn as nn
 import torch.distributions
