@@ -43,15 +43,14 @@ class Actor_Critic(nn.Module):
     def forward(self):
         raise NotImplementedError
     
-    def interact(self, state, gamedata):
-        action_mean = self.network_act(state)
-        cov_mat = torch.diag(self.action_var).to(device)
-        
+    def interact(self, istates, gamedata):
+        action_mean     = self.network_act(istates)
+        cov_mat         = torch.diag(self.action_var).to(device)
         dist            = torch.distributions.MultivariateNormal(action_mean, cov_mat)
         action          = dist.sample()
         action_logprob  = dist.log_prob(action)
         
-        gamedata.states.append(state)
+        gamedata.states.append(istates)
         gamedata.actions.append(action)
         gamedata.logprobs.append(action_logprob)
         
@@ -85,9 +84,9 @@ class CPPO:
         
         self.MseLoss = nn.MSELoss()
     
-    def select_action(self, state, gamedata):
-        state = torch.FloatTensor(state.reshape(1, -1)).to(device)
-        return self.policy_old.interact(state, gamedata).cpu().data.numpy().flatten()
+    def select_action(self, estates, gamedata):
+        istates = torch.FloatTensor(estates.reshape(1, -1)).to(device)
+        return self.policy_old.interact(istates, gamedata).cpu().data.numpy().flatten()
     
     def train_update(self, gamedata):
         # Monte Carlo estimate of rewards:

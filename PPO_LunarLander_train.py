@@ -42,13 +42,13 @@ class Actor_Critic(nn.Module):
     def forward(self):
         raise NotImplementedError
         
-    def interact(self, state, gamedata):
-        state           = torch.from_numpy(state).float().to(device)
-        action_probs    = self.network_act(state)
+    def interact(self, istates, gamedata):
+        npstates        = torch.from_numpy(istates).float().to(device)
+        action_probs    = self.network_act(npstates)
         dist            = torch.distributions.Categorical(action_probs)
         action          = dist.sample()
         
-        gamedata.states.append(state)
+        gamedata.states.append(npstates)
         gamedata.actions.append(action)
         gamedata.logprobs.append(dist.log_prob(action))
         
