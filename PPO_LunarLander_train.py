@@ -77,12 +77,12 @@ class Actor_Critic(nn.Module):
     
     def calculation(self, states, actions):
         action_probs    = self.network_act(states)
-        dist            = torch.distributions.Categorical(action_probs)
-        action_logprobs = dist.log_prob(actions)
-        dist_entropy    = dist.entropy()
+        distribute      = torch.distributions.Categorical(action_probs)
+        action_logprobs = distribute.log_prob(actions)
+        entropy         = distribute.entropy()
         state_value     = self.network_value(states)
         
-        return action_logprobs, torch.squeeze(state_value), dist_entropy
+        return action_logprobs, torch.squeeze(state_value), entropy
         
 class CPPO:
     def __init__(self, dim_states, dim_acts, h_neurons, lr, gamma, train_epochs, eps_clip, betas):
@@ -120,7 +120,7 @@ class CPPO:
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             # Evaluating old actions and values :
-            logprobs, state_values, dist_entropy = self.policy.calculation(old_states, old_actions)
+            logprobs, state_values, entropy = self.policy.calculation(old_states, old_actions)
 
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(logprobs - old_logprobs.detach())
@@ -129,7 +129,7 @@ class CPPO:
             advantages = rewards - state_values.detach()
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
-            loss = -torch.min(surr1, surr2) + 0.5*self.mseLoss(state_values, rewards) - 0.01*dist_entropy
+            loss = -torch.min(surr1, surr2) + 0.5*self.mseLoss(state_values, rewards) - 0.01*entropy
 
             # take gradient step
             self.optimizer.zero_grad()
