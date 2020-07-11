@@ -1,4 +1,5 @@
 # Refer to:
+# http://fatalfeel.blogspot.com/2013/12/ppo-and-awr-guiding.html #PPO lessons
 # https://towardsdatascience.com/solving-lunar-lander-openaigym-reinforcement-learning-785675066197
 # https://pytorch.org/docs/stable/distributions.html
 # check 8 states and 4 actions at ./gym/envs/box2d/lunar_lander.py
@@ -14,9 +15,9 @@ s[6] 1 if first leg has contact
 s[7] 1 if second leg has contact
 The 8 elements present to one state
 When those elements happened we need do one action and get the highest rewards
-key 1 - main engine
-key 2 - left engine
-key 3 - right engine
+key 1 - right engine
+key 2 - main engine
+key 3 - left engine
 key 4 - nope'''
 
 import torch
@@ -31,14 +32,14 @@ class GameContent:
         self.actions        = []
         self.states         = []
         self.rewards        = []
-        self.logprobs       = []
+        self.actoflogprobs  = []
         self.is_terminals   = []
     
     def ReleaseData(self):
         del self.actions[:]
         del self.states[:]
         del self.rewards[:]
-        del self.logprobs[:]
+        del self.actoflogprobs[:]
         del self.is_terminals[:]
 
 class Actor_Critic(nn.Module):
@@ -65,15 +66,15 @@ class Actor_Critic(nn.Module):
         
     def interact(self, estates, gamedata):
         tstates         = torch.from_numpy(estates).float().to(device)
-        action_probs    = self.network_act(tstates)
-        distribute      = torch.distributions.Categorical(action_probs)
+        action_probs    = self.network_act(tstates) #𝞹(a|s) = P(a,s) 8 elements corresponds to one action
+        distribute      = torch.distributions.Categorical(action_probs) #category distribution
         action          = distribute.sample()
         
         gamedata.states.append(tstates)
         gamedata.actions.append(action)
-        gamedata.logprobs.append(distribute.log_prob(action))
+        gamedata.actoflogprobs.append(distribute.log_prob(action)) #the action number corresponds to the action_probs into log
         
-        return action.item()
+        return action.item() #return action_probs index corresponds to key 1,2,3,4
     
     def calculation(self, states, actions):
         action_probs    = self.network_act(states)
@@ -102,20 +103,24 @@ class CPPO:
         # Monte Carlo estimate of state rewards:
         rewards = []
         discounted_reward = 0
+
         for reward, is_terminal in zip(reversed(gamedata.rewards), reversed(gamedata.is_terminals)):
             if is_terminal:
                 discounted_reward = 0
+            # R(τ) = gamma^n * τ(a|s)R(a,s) , n=1~k
             discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
 
-        # Normalizing the rewards:
         rewards = torch.tensor(rewards, dtype=torch.float32).to(device)
+        #E[R(τ)] = Σgamma^k * τ(a|s)R(a,s) = rewards.mean()
+        #(Rewards - average_R) / (Deviation_R + 0.00001)
+        #rewards.std is {1/(n-1) * Σ(x-x_average)} ** 0.5
         rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
 
         # convert list to tensor
         old_states      = torch.stack(gamedata.states).to(device).detach()
         old_actions     = torch.stack(gamedata.actions).to(device).detach()
-        old_logprobs    = torch.stack(gamedata.logprobs).to(device).detach()
+        old_logprobs    = torch.stack(gamedata.actoflogprobs).to(device).detach()
 
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
@@ -185,8 +190,9 @@ if __name__ == '__main__':
             action = ppo.policy_old.interact(estates, gamedata)
             estates, reward, done, _ = env.step(action)
 
-            # Saving reward and is_terminal:
+            # one reward R(τ) = τ(a|s)R(a,s) in a certain state select an action and return the reward
             gamedata.rewards.append(reward)
+            # Saving reward and is_terminal:
             gamedata.is_terminals.append(done)
 
             # train_update if its time
