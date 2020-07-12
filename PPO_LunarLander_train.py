@@ -77,7 +77,7 @@ class Actor_Critic(nn.Module):
         return action.item() #return action_probs index corresponds to key 1,2,3,4
     
     def calculation(self, states, actions):
-        critic_actprobs     = self.network_act(states)
+        critic_actprobs     = self.network_act(states) #each current with one action probility
         distribute          = torch.distributions.Categorical(critic_actprobs)
         critic_actlogprobs  = distribute.log_prob(actions)
         entropy             = distribute.entropy()
