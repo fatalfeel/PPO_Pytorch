@@ -135,6 +135,8 @@ class CPPO:
             critic_actlogprobs, critic_states, entropy = self.policy_next.calculation(curraccu_states, curraccu_actions)
 
             # Finding the ratio (pi_theta / pi_theta__old):
+            # log(critic) - log(curraccu) = log(critic/curraccu)
+            # ratios = e^log(critic/curraccu)
             ratios = torch.exp(critic_actlogprobs - curraccu_logprobs.detach())
 
             # Finding Surrogate Loss:
