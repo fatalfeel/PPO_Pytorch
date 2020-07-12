@@ -46,7 +46,7 @@ class Actor_Critic(nn.Module):
     def __init__(self, dim_states, dim_acts, h_neurons):
         super(Actor_Critic, self).__init__()
 
-        # actor
+        # state in and action prob out
         self.network_act = nn.Sequential(nn.Linear(dim_states, h_neurons),
                                         nn.Tanh(),
                                         nn.Linear(h_neurons, h_neurons),
@@ -54,7 +54,7 @@ class Actor_Critic(nn.Module):
                                         nn.Linear(h_neurons, dim_acts),
                                         nn.Softmax(dim=-1))
         
-        # critic
+        # state in and critic value out
         self.network_critic = nn.Sequential(nn.Linear(dim_states, h_neurons),
                                             nn.Tanh(),
                                             nn.Linear(h_neurons, h_neurons),
@@ -81,11 +81,11 @@ class Actor_Critic(nn.Module):
         distribute          = torch.distributions.Categorical(critic_actprobs)
         critic_actlogprobs  = distribute.log_prob(actions)
         entropy             = distribute.entropy()
-        critic_states       = self.network_critic(states)
+        critic_value        = self.network_critic(states)
         
         #if dimension can squeeze then tensor 3d to 2d.
         #EX: squeeze tensor[2,1,3] become to tensor[2,3]
-        return critic_actlogprobs, torch.squeeze(critic_states), entropy
+        return critic_actlogprobs, torch.squeeze(critic_value), entropy
         
 class CPPO:
     def __init__(self, dim_states, dim_acts, h_neurons, lr, gamma, train_epochs, eps_clip, betas):
@@ -132,7 +132,7 @@ class CPPO:
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             # Evaluating old actions and values :
-            critic_actlogprobs, critic_states, entropy = self.policy_next.calculation(curraccu_states, curraccu_actions)
+            critic_actlogprobs, critic_value, entropy = self.policy_next.calculation(curraccu_states, curraccu_actions)
 
             # Finding the ratio (pi_theta / pi_theta__old):
             # log(critic) - log(curraccu) = log(critic/curraccu)
@@ -140,10 +140,10 @@ class CPPO:
             ratios = torch.exp(critic_actlogprobs - curraccu_logprobs.detach())
 
             # Finding Surrogate Loss:
-            advantages = curraccu_stdscore - critic_states.detach()
+            advantages = curraccu_stdscore - critic_value.detach()
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
-            loss = -torch.min(surr1, surr2) + 0.5*self.mseLoss(critic_states, curraccu_stdscore) - 0.01*entropy
+            loss = -torch.min(surr1, surr2) + 0.5*self.mseLoss(critic_value, curraccu_stdscore) - 0.01*entropy
 
             # take gradient step
             self.optimizer.zero_grad()
