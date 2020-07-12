@@ -3,6 +3,8 @@ from PPO_LunarLander_train import GameContent, CPPO
 from PIL import Image
 import torch
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 if __name__ == '__main__':
     ############## Hyperparameters ##############
     env_name = "LunarLander-v2"
@@ -30,14 +32,14 @@ if __name__ == '__main__':
 
     directory   = "./preTrained/"
     filename    = "PPO_{}.pth".format(env_name)
-    ppo.policy_old.load_state_dict(torch.load(directory+filename))
+    ppo.policy_curr.load_state_dict(torch.load(directory+filename))
     
     for ep in range(1, n_episodes+1):
         ep_reward = 0
         estates = env.reset()
         for t in range(max_timesteps):
-            action = ppo.policy_old.interact(estates, gamedata)
-            estates, reward, done, _ = env.step(action)
+            action                      = ppo.policy_curr.interact(estates, gamedata)
+            estates, reward, done, _    = env.step(action)
             ep_reward += reward
             if render:
                 env.render()
