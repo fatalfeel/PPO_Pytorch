@@ -121,27 +121,27 @@ class CPPO:
         1e-5 = 0.00001 avoid rewards.std() is zero
         (Rewards - average_R) / (standard_R + 0.00001) is standard score'''
         #rewards    = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
-        stdscore    = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
+        curraccu_stdscore   = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
 
         # convert list to tensor
         # torch.stack is combine many tensor 1D to 2D
-        curraccu_states      = torch.stack(gamedata.states).to(device).detach()
-        curraccu_actions     = torch.stack(gamedata.actions).to(device).detach()
-        curraccu_logprobs    = torch.stack(gamedata.actoflogprobs).to(device).detach()
+        curraccu_states     = torch.stack(gamedata.states).to(device).detach()
+        curraccu_actions    = torch.stack(gamedata.actions).to(device).detach()
+        curraccu_logprobs   = torch.stack(gamedata.actoflogprobs).to(device).detach()
 
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             # Evaluating old actions and values :
-            critic_logprobs, critic_states, entropy = self.policy_next.calculation(curraccu_states, curraccu_actions)
+            critic_actlogprobs, critic_states, entropy = self.policy_next.calculation(curraccu_states, curraccu_actions)
 
             # Finding the ratio (pi_theta / pi_theta__old):
-            ratios = torch.exp(critic_logprobs - curraccu_logprobs.detach())
+            ratios = torch.exp(critic_actlogprobs - curraccu_logprobs.detach())
 
             # Finding Surrogate Loss:
-            advantages = stdscore - critic_states.detach()
+            advantages = curraccu_stdscore - critic_states.detach()
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
-            loss = -torch.min(surr1, surr2) + 0.5*self.mseLoss(critic_states, stdscore) - 0.01*entropy
+            loss = -torch.min(surr1, surr2) + 0.5*self.mseLoss(critic_states, curraccu_stdscore) - 0.01*entropy
 
             # take gradient step
             self.optimizer.zero_grad()
