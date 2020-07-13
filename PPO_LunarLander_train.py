@@ -46,15 +46,27 @@ class Actor_Critic(nn.Module):
     def __init__(self, dim_states, dim_acts, h_neurons):
         super(Actor_Critic, self).__init__()
 
-        # state in and action prob out
+        ###game is env = gym.make(env_name)
+        ###game-state combine with 8 elements that describe in lunar_lander.py
+        '''In policy_curr network_act is first-person perspective actor playing in the game. 
+           when game state in then action prob out.
+        (1) game-state -> first-persion network => prob(r, main, left, nope)
+        (2) According to prob(r, main, left, nope), pick one of direction(r, main, left, nope) into game
+            the code is env.step(action)
+        (3) env.step(action) return the rewards'''
+
+        '''In policy_next
+        (1) game-state -> first-persion network => prob(r, main, left, nope)
+        (2) ratios = e^log(critic_log_prob/currenr_log_prob) = e^(logcritic_log_prob-currenr_log_prob) '''
         self.network_act = nn.Sequential(nn.Linear(dim_states, h_neurons),
                                         nn.Tanh(),
                                         nn.Linear(h_neurons, h_neurons),
                                         nn.Tanh(),
                                         nn.Linear(h_neurons, dim_acts),
                                         nn.Softmax(dim=-1))
-        
-        # state in and critic value out
+
+        '''critic network is second-person perspective actor observer in the game, when game state in then reward out
+        (1)game-state -> second-persion network -> Get Reward that call Value = V(s)'''
         self.network_critic = nn.Sequential(nn.Linear(dim_states, h_neurons),
                                             nn.Tanh(),
                                             nn.Linear(h_neurons, h_neurons),
@@ -63,7 +75,8 @@ class Actor_Critic(nn.Module):
         
     def forward(self):
         raise NotImplementedError
-        
+
+    #policy_curr.interact will call
     def interact(self, envstate, gamedata):
         torchstate      = torch.from_numpy(envstate).float().to(device)
         action_probs    = self.network_act(torchstate) #tau(a|s) = P(a,s) 8 elements corresponds to one action
@@ -75,17 +88,18 @@ class Actor_Critic(nn.Module):
         gamedata.actoflogprobs.append(distribute.log_prob(action)) #the action number corresponds to the action_probs into log
         
         return action.item() #return action_probs index corresponds to key 1,2,3,4
-    
+
+    #policy_next.calculation will call
     def calculation(self, states, actions):
         critic_actprobs     = self.network_act(states) #each current with one action probility
         distribute          = torch.distributions.Categorical(critic_actprobs)
         critic_actlogprobs  = distribute.log_prob(actions)
-        entropy             = distribute.entropy() #entropy = uncertain percentage
-        cstate_reward       = self.network_critic(states)
+        entropy             = distribute.entropy()          #entropy = uncertain percentage
+        cstate_value        = self.network_critic(states)   #cstate_value is V(s) in A3C theroy
         
         #if dimension can squeeze then tensor 3d to 2d.
         #EX: squeeze tensor[2,1,3] become to tensor[2,3]
-        return critic_actlogprobs, torch.squeeze(cstate_reward), entropy
+        return critic_actlogprobs, torch.squeeze(cstate_value), entropy
         
 class CPPO:
     def __init__(self, dim_states, dim_acts, h_neurons, lr, gamma, train_epochs, eps_clip, betas):
@@ -115,13 +129,14 @@ class CPPO:
             discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
 
+        # rewards is Q(s,a) interact with game
         rewards = torch.tensor(rewards, dtype=torch.float32).to(device)
         '''rewards.mean() is E[R(τ)]
         rewards.std on torch is {1/(n-1) * Σ(x - x_average)} ** 0.5  (x ** 0.5 = x^0.5)
-        1e-5 = 0.00001 avoid rewards.std() is zero
+        1e-5 = 0.00001 which avoid rewards.std() is zero
         (Rewards - average_R) / (standard_R + 0.00001) is standard score'''
         #rewards    = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
-        curraccu_stdscore   = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
+        curraccu_stdscore   = (rewards - rewards.mean()) / (rewards.std() + 1e-5) #Q(s,a)
 
         # convert list to tensor
         # torch.stack is combine many tensor 1D to 2D
@@ -131,8 +146,8 @@ class CPPO:
 
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
-            # Evaluating old actions and values :
-            critic_actlogprobs, cstate_reward, entropy = self.policy_next.calculation(curraccu_states, curraccu_actions)
+            #cstate_value is V(s) in A3C theroy. critic network is another actor input state
+            critic_actlogprobs, cstate_value, entropy = self.policy_next.calculation(curraccu_states, curraccu_actions)
 
             # Finding the ratio (pi_theta / pi_theta__old):
             # log(critic) - log(curraccu) = log(critic/curraccu)
@@ -142,11 +157,13 @@ class CPPO:
             # Finding Surrogate Loss:
             # R = (rewards-rewards.mean)/rewards.std
             # critic_state_reward   = network_critic(curraccu_states)
-            # advantages            = R - critic_state_reward
-            advantages = curraccu_stdscore - cstate_reward.detach() #Q - V
-            surr1 = ratios * advantages
-            surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
-            loss = -torch.min(surr1, surr2) + 0.5*self.mseLoss(cstate_reward, curraccu_stdscore) - 0.01*entropy
+            # advantages            = R - critic_state_value(reward)
+            advantages  = curraccu_stdscore - cstate_value.detach() #A(s,a) => Q(s,a) - V(s)
+            surr1       = ratios * advantages
+            surr2       = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
+
+            # mseLoss is Mean Square Error = (target - output)^2
+            loss        = -torch.min(surr1, surr2) + 0.5*self.mseLoss(cstate_value, curraccu_stdscore) - 0.01*entropy
 
             # take gradient step
             self.optimizer.zero_grad()
@@ -198,7 +215,7 @@ if __name__ == '__main__':
         for t in range(max_timesteps):
             timestep += 1
 
-            # Running policy_old:
+            # Running policy_current:
             action = ppo.policy_curr.interact(envstate, gamedata)
             envstate, reward, done, _ = env.step(action)
 
