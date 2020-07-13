@@ -79,16 +79,16 @@ class CPPO:
         
         self.policy_next         = Actor_Critic(dim_states, dim_acts, action_std).to(device)
         self.optimizer      = torch.optim.Adam(self.policy_next.parameters(), lr=lr, betas=betas)
-        
+
         self.policy_curr = Actor_Critic(dim_states, dim_acts, action_std).to(device)
         self.policy_curr.load_state_dict(self.policy_next.state_dict())
-        
+
         self.MseLoss = nn.MSELoss()
-    
+
     #def select_action(self, estates, gamedata):
     #    tstates = torch.FloatTensor(estates.reshape(1, -1)).to(device)
     #    return self.policy_curr.interact(tstates, gamedata).cpu().data.numpy().flatten()
-    
+
     def train_update(self, gamedata):
         # Monte Carlo estimate of rewards:
         rewards = []
@@ -98,21 +98,21 @@ class CPPO:
                 discounted_reward = 0
             discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
-        
+
         # Normalizing the rewards:
         rewards             = torch.tensor(rewards, dtype=torch.float32).to(device)
         curraccu_stdscore   = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
-        
+
         # convert list to tensor
         curr_states      = torch.squeeze(torch.stack(gamedata.states).to(device), 1).detach()
         curr_actions     = torch.squeeze(torch.stack(gamedata.actions).to(device), 1).detach()
         curr_logprobs    = torch.squeeze(torch.stack(gamedata.logprobs), 1).to(device).detach()
-        
+
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             #cstate_value is V(s) in A3C theroy. critic network is another actor input state
             critic_actlogprobs, cstate_reward, entropy = self.policy_next.calculation(curr_states, curr_actions)
-            
+
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(critic_actlogprobs - curr_logprobs.detach())
 
@@ -121,33 +121,33 @@ class CPPO:
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
             loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(cstate_reward, curraccu_stdscore) - 0.01*entropy
-            
+
             # take gradient step
             self.optimizer.zero_grad()
             loss.mean().backward()
             self.optimizer.step()
-            
+
         # Copy new weights into old policy:
         self.policy_curr.load_state_dict(self.policy_next.state_dict())
-        
+
 if __name__ == '__main__':
     ############## Hyperparameters ##############
     env_name        = "BipedalWalker-v3"
     render          = False
-    solved_reward   = 300         # stop training if avg_reward > solved_reward
-    log_interval    = 20           # print avg reward in the interval
-    max_episodes    = 10000        # max training episodes
-    max_timesteps   = 1500        # max timesteps in one episode
-    update_timestep = 4000      # train_update policy every n timesteps
-    action_std      = 0.5            # constant std for action distribution (Multivariate Normal)
-    train_epochs    = 80               # train_update policy for K epochs
-    eps_clip        = 0.2              # clip parameter for CPPO
-    gamma           = 0.99                # discount factor
-    lr              = 0.0003                 # parameters for Adam optimizer
+    solved_reward   = 300           # stop training if avg_reward > solved_reward
+    log_interval    = 20            # print avg reward in the interval
+    max_episodes    = 10000         # max training episodes
+    max_timesteps   = 1500          # max timesteps in one episode
+    update_timestep = 4000          # train_update policy every n timesteps
+    action_std      = 0.5           # constant std for action distribution (Multivariate Normal)
+    train_epochs    = 80            # train_update policy for K epochs
+    lr              = 0.0001  # parameters for Adam optimizer
+    eps_clip        = 0.2           # clip parameter for CPPO
+    gamma           = 0.99          # discount factor
     betas           = (0.9, 0.999)
     random_seed     = None
     #############################################
-    
+
     # creating environment
     env         = gym.make(env_name)
     dim_states  = env.observation_space.shape[0]
@@ -158,15 +158,15 @@ if __name__ == '__main__':
         torch.manual_seed(random_seed)
         env.seed(random_seed)
         np.random.seed(random_seed)
-    
+
     gamedata    = GameContent()
     ppo         = CPPO(dim_states, dim_acts, action_std, lr, gamma, train_epochs, eps_clip, betas)
-        
+
     # logging variables
     running_reward  = 0
     avg_length      = 0
     time_step       = 0
-    
+
     # training loop
     for i_episode in range(1, max_episodes+1):
         envstate = env.reset()
@@ -176,31 +176,31 @@ if __name__ == '__main__':
             #action = ppo.select_action(estates, gamedata)
             action = ppo.policy_curr.interact(envstate, gamedata)
             envstate, reward, done, _ = env.step(action)
-            
+
             # Saving reward and is_terminals:
             gamedata.rewards.append(reward)
             gamedata.is_terminals.append(done)
-            
+
             # train_update if its time
             if time_step % update_timestep == 0:
                 ppo.train_update(gamedata)
                 gamedata.clear_memory()
                 time_step = 0
-            
+
             running_reward += reward
             if render:
                 env.render()
             if done:
                 break
-        
+
         avg_length += t
-        
+
         # stop training if avg_reward > solved_reward
         if running_reward > (log_interval*solved_reward):
             print("########## Solved! ##########")
             torch.save(ppo.policy_next.state_dict(), './PPO_{}.pth'.format(env_name))
             break
-        
+
         # save every 500 episodes
         if i_episode % 500 == 0:
             torch.save(ppo.policy_next.state_dict(), './PPO_{}_episode_{}.pth'.format(env_name, i_episode))

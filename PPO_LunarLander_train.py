@@ -187,8 +187,8 @@ if __name__ == '__main__':
     update_timestep = 2000          # train_update policy every n timesteps
     gamma           = 0.99          # discount factor
     train_epochs    = 4             # train_update policy for epochs
+    lr              = 0.0001        # learning rate
     eps_clip        = 0.2           # clip parameter for PPO2
-    lr              = 0.002         # learning rate
     betas           = (0.9, 0.999)  # Adam β
     random_seed     = None
     #############################################
