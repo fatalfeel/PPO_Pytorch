@@ -49,15 +49,16 @@ class Actor_Critic(nn.Module):
         ###game is env = gym.make(env_name)
         ###game-state combine with 8 elements that describe in lunar_lander.py
         '''In policy_curr network_act is first-person perspective actor playing in the game. 
-           when game state in then action prob out.
-        (1) game-state -> first-persion network => prob(r, main, left, nope)
+           when game state input then action prob out.
+        (1) game-state -> first-persion network_act => prob(r, main, left, nope)
         (2) According to prob(r, main, left, nope), pick one of direction(r, main, left, nope) into game
             the code is env.step(action)
         (3) env.step(action) return the rewards'''
 
-        '''In policy_next
-        (1) game-state -> first-persion network => prob(r, main, left, nope)
-        (2) ratios = e^log(critic_log_prob/currenr_log_prob) = e^(logcritic_log_prob-currenr_log_prob) '''
+        '''In policy_next self.network_act is second-person perspective actor observer in the game
+        (1) game-state -> second-persion network_act => prob(r, main, left, nope)
+        (2) use first-person actions sample distribute.log_prob(actions) get critic actlogprobs
+        (3) ratios = e^log(critic_log_prob/currenr_log_prob) = e^(logcritic_log_prob-currenr_log_prob)'''
         self.network_act = nn.Sequential(nn.Linear(dim_states, h_neurons),
                                         nn.Tanh(),
                                         nn.Linear(h_neurons, h_neurons),
