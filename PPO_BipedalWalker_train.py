@@ -62,12 +62,12 @@ class Actor_Critic(nn.Module):
         action_var      = self.action_var.expand_as(action_mean)
         cov_mat         = torch.diag_embed(action_var).to(device)
         distribute      = torch.distributions.MultivariateNormal(action_mean, cov_mat)
-        
         action_logprobs = distribute.log_prob(actions)
-        dist_entropy    = distribute.entropy()
+        # entropy is uncertain percentage, value higher mean uncertain more
+        entropy         = distribute.entropy()
         cstate_reward   = self.network_value(states)
         
-        return action_logprobs, torch.squeeze(cstate_reward), dist_entropy
+        return action_logprobs, torch.squeeze(cstate_reward), entropy
 
 class CPPO:
     def __init__(self, dim_states, dim_acts, action_std, lr, gamma, train_epochs, eps_clip, betas):
@@ -110,8 +110,8 @@ class CPPO:
         
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
-            # Evaluating old actions and values :
-            critic_actlogprobs, cstate_reward, dist_entropy = self.policy.calculation(curr_states, curr_actions)
+            #cstate_value is V(s) in A3C theroy. critic network is another actor input state
+            critic_actlogprobs, cstate_reward, entropy = self.policy.calculation(curr_states, curr_actions)
             
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(critic_actlogprobs - curr_logprobs.detach())
@@ -120,7 +120,7 @@ class CPPO:
             advantages = curraccu_stdscore - cstate_reward.detach()
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
-            loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(cstate_reward, curraccu_stdscore) - 0.01*dist_entropy
+            loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(cstate_reward, curraccu_stdscore) - 0.01*entropy
             
             # take gradient step
             self.optimizer.zero_grad()

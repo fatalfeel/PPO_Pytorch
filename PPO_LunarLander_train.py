@@ -94,7 +94,8 @@ class Actor_Critic(nn.Module):
         critic_actprobs     = self.network_act(states) #each current with one action probility
         distribute          = torch.distributions.Categorical(critic_actprobs)
         critic_actlogprobs  = distribute.log_prob(actions)
-        entropy             = distribute.entropy()          #entropy = uncertain percentage
+        # entropy is uncertain percentage, value higher mean uncertain more
+        entropy             = distribute.entropy()
         cstate_value        = self.network_critic(states)   #cstate_value is V(s) in A3C theroy
         
         #if dimension can squeeze then tensor 3d to 2d.

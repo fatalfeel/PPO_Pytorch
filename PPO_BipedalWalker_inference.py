@@ -30,8 +30,8 @@ if __name__ == '__main__':
 
     directory = "./preTrained/"
     filename = "PPO_{}.pth".format(env_name)
-    ppo.policy_old.load_state_dict(torch.load(directory+filename))
-    # filename and directory to load model from
+    # map_location=torch.device('cpu') for cpu only if you have cuda then cancel it
+    ppo.policy_old.load_state_dict(torch.load(directory+filename, map_location=torch.device('cpu')))
 
     for ep in range(1, n_episodes+1):
         ep_reward = 0
