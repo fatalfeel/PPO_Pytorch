@@ -57,7 +57,7 @@ class Actor_Critic(nn.Module):
 
         '''In policy_next self.network_act is second-person perspective actor observer in the game
         (1) game-state -> second-persion network_act => prob(r, main, left, nope)
-        (2) use first-person actions sample distribute.log_prob(actions) get critic actlogprobs
+        (2) use samples of first-person actions in distribute.log_prob(actions) get critic actlogprobs
         (3) ratios = e^log(critic_log_prob/currenr_log_prob) = e^(logcritic_log_prob-currenr_log_prob)'''
         self.network_act = nn.Sequential(nn.Linear(dim_states, h_neurons),
                                         nn.Tanh(),
