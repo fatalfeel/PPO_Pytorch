@@ -77,17 +77,17 @@ class CPPO:
         self.eps_clip       = eps_clip
         self.train_epochs   = train_epochs
         
-        self.policy         = Actor_Critic(dim_states, dim_acts, action_std).to(device)
-        self.optimizer      = torch.optim.Adam(self.policy.parameters(), lr=lr, betas=betas)
+        self.policy_next         = Actor_Critic(dim_states, dim_acts, action_std).to(device)
+        self.optimizer      = torch.optim.Adam(self.policy_next.parameters(), lr=lr, betas=betas)
         
-        self.policy_old = Actor_Critic(dim_states, dim_acts, action_std).to(device)
-        self.policy_old.load_state_dict(self.policy.state_dict())
+        self.policy_curr = Actor_Critic(dim_states, dim_acts, action_std).to(device)
+        self.policy_curr.load_state_dict(self.policy_next.state_dict())
         
         self.MseLoss = nn.MSELoss()
     
     #def select_action(self, estates, gamedata):
     #    tstates = torch.FloatTensor(estates.reshape(1, -1)).to(device)
-    #    return self.policy_old.interact(tstates, gamedata).cpu().data.numpy().flatten()
+    #    return self.policy_curr.interact(tstates, gamedata).cpu().data.numpy().flatten()
     
     def train_update(self, gamedata):
         # Monte Carlo estimate of rewards:
@@ -111,7 +111,7 @@ class CPPO:
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             #cstate_value is V(s) in A3C theroy. critic network is another actor input state
-            critic_actlogprobs, cstate_reward, entropy = self.policy.calculation(curr_states, curr_actions)
+            critic_actlogprobs, cstate_reward, entropy = self.policy_next.calculation(curr_states, curr_actions)
             
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(critic_actlogprobs - curr_logprobs.detach())
@@ -128,7 +128,7 @@ class CPPO:
             self.optimizer.step()
             
         # Copy new weights into old policy:
-        self.policy_old.load_state_dict(self.policy.state_dict())
+        self.policy_curr.load_state_dict(self.policy_next.state_dict())
         
 if __name__ == '__main__':
     ############## Hyperparameters ##############
@@ -174,7 +174,7 @@ if __name__ == '__main__':
             time_step +=1
             # Running policy_old:
             #action = ppo.select_action(estates, gamedata)
-            action = ppo.policy_old.interact(envstate, gamedata)
+            action = ppo.policy_curr.interact(envstate, gamedata)
             envstate, reward, done, _ = env.step(action)
             
             # Saving reward and is_terminals:
@@ -198,12 +198,12 @@ if __name__ == '__main__':
         # stop training if avg_reward > solved_reward
         if running_reward > (log_interval*solved_reward):
             print("########## Solved! ##########")
-            torch.save(ppo.policy.state_dict(), './PPO_{}.pth'.format(env_name))
+            torch.save(ppo.policy_next.state_dict(), './PPO_{}.pth'.format(env_name))
             break
         
         # save every 500 episodes
         if i_episode % 500 == 0:
-            torch.save(ppo.policy.state_dict(), './PPO_{}_episode_{}.pth'.format(env_name, i_episode))
+            torch.save(ppo.policy_next.state_dict(), './PPO_{}_episode_{}.pth'.format(env_name, i_episode))
             
         # logging
         if i_episode % log_interval == 0:
