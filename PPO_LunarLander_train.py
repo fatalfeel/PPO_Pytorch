@@ -14,7 +14,7 @@ s[5] is the angular speed
 s[6] 1 if first leg has contact
 s[7] 1 if second leg has contact
 The 8 elements present to one state
-When those elements happened we need do one action and get the highest rewards
+When those elements happened we need do one action and get the highest reward
 key 1 - right engine
 key 2 - main engine
 key 3 - left engine
