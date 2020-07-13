@@ -61,10 +61,10 @@ class Actor_Critic(nn.Module):
         action_mean     = self.network_act(states)
         action_var      = self.action_var.expand_as(action_mean)
         cov_mat         = torch.diag_embed(action_var).to(device)
-        dist            = torch.distributions.MultivariateNormal(action_mean, cov_mat)
+        distribute      = torch.distributions.MultivariateNormal(action_mean, cov_mat)
         
-        action_logprobs = dist.log_prob(actions)
-        dist_entropy    = dist.entropy()
+        action_logprobs = distribute.log_prob(actions)
+        dist_entropy    = distribute.entropy()
         cstate_reward   = self.network_value(states)
         
         return action_logprobs, torch.squeeze(cstate_reward), dist_entropy
