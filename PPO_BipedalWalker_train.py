@@ -43,8 +43,8 @@ class Actor_Critic(nn.Module):
     def forward(self):
         raise NotImplementedError
     
-    def interact(self, estates, gamedata):
-        tstates         = torch.FloatTensor(estates.reshape(1, -1)).to(device)
+    def interact(self, envstate, gamedata):
+        tstates         = torch.FloatTensor(envstate.reshape(1, -1)).to(device)
         action_mean     = self.network_act(tstates)
         cov_mat         = torch.diag(self.action_var).to(device)
         dist            = torch.distributions.MultivariateNormal(action_mean, cov_mat)
@@ -65,9 +65,9 @@ class Actor_Critic(nn.Module):
         
         action_logprobs = dist.log_prob(actions)
         dist_entropy    = dist.entropy()
-        state_value     = self.network_value(states)
+        cstate_reward   = self.network_value(states)
         
-        return action_logprobs, torch.squeeze(state_value), dist_entropy
+        return action_logprobs, torch.squeeze(cstate_reward), dist_entropy
 
 class CPPO:
     def __init__(self, dim_states, dim_acts, action_std, lr, gamma, train_epochs, eps_clip, betas):
@@ -100,27 +100,27 @@ class CPPO:
             rewards.insert(0, discounted_reward)
         
         # Normalizing the rewards:
-        rewards = torch.tensor(rewards, dtype=torch.float32).to(device)
-        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
+        rewards             = torch.tensor(rewards, dtype=torch.float32).to(device)
+        curraccu_stdscore   = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
         
         # convert list to tensor
-        old_states      = torch.squeeze(torch.stack(gamedata.states).to(device), 1).detach()
-        old_actions     = torch.squeeze(torch.stack(gamedata.actions).to(device), 1).detach()
-        old_logprobs    = torch.squeeze(torch.stack(gamedata.logprobs), 1).to(device).detach()
+        curr_states      = torch.squeeze(torch.stack(gamedata.states).to(device), 1).detach()
+        curr_actions     = torch.squeeze(torch.stack(gamedata.actions).to(device), 1).detach()
+        curr_logprobs    = torch.squeeze(torch.stack(gamedata.logprobs), 1).to(device).detach()
         
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             # Evaluating old actions and values :
-            logprobs, state_values, dist_entropy = self.policy.calculation(old_states, old_actions)
+            critic_actlogprobs, cstate_reward, dist_entropy = self.policy.calculation(curr_states, curr_actions)
             
             # Finding the ratio (pi_theta / pi_theta__old):
-            ratios = torch.exp(logprobs - old_logprobs.detach())
+            ratios = torch.exp(critic_actlogprobs - curr_logprobs.detach())
 
             # Finding Surrogate Loss:
-            advantages = rewards - state_values.detach()   
+            advantages = curraccu_stdscore - cstate_reward.detach()
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
-            loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(state_values, rewards) - 0.01*dist_entropy
+            loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(cstate_reward, curraccu_stdscore) - 0.01*dist_entropy
             
             # take gradient step
             self.optimizer.zero_grad()
@@ -169,13 +169,13 @@ if __name__ == '__main__':
     
     # training loop
     for i_episode in range(1, max_episodes+1):
-        estates = env.reset()
+        envstate = env.reset()
         for t in range(max_timesteps):
             time_step +=1
             # Running policy_old:
             #action = ppo.select_action(estates, gamedata)
-            action = ppo.policy_old.interact(estates, gamedata)
-            estates, reward, done, _ = env.step(action)
+            action = ppo.policy_old.interact(envstate, gamedata)
+            envstate, reward, done, _ = env.step(action)
             
             # Saving reward and is_terminals:
             gamedata.rewards.append(reward)

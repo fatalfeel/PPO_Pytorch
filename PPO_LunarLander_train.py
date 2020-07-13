@@ -64,13 +64,13 @@ class Actor_Critic(nn.Module):
     def forward(self):
         raise NotImplementedError
         
-    def interact(self, estates, gamedata):
-        tstates         = torch.from_numpy(estates).float().to(device)
-        action_probs    = self.network_act(tstates) #𝞹(a|s) = P(a,s) 8 elements corresponds to one action
+    def interact(self, envstate, gamedata):
+        torchstate      = torch.from_numpy(envstate).float().to(device)
+        action_probs    = self.network_act(torchstate) #tau(a|s) = P(a,s) 8 elements corresponds to one action
         distribute      = torch.distributions.Categorical(action_probs) #category distribution
         action          = distribute.sample()
         
-        gamedata.states.append(tstates)
+        gamedata.states.append(torchstate)
         gamedata.actions.append(action)
         gamedata.actoflogprobs.append(distribute.log_prob(action)) #the action number corresponds to the action_probs into log
         
@@ -80,12 +80,12 @@ class Actor_Critic(nn.Module):
         critic_actprobs     = self.network_act(states) #each current with one action probility
         distribute          = torch.distributions.Categorical(critic_actprobs)
         critic_actlogprobs  = distribute.log_prob(actions)
-        entropy             = distribute.entropy()
-        critic_value        = self.network_critic(states)
+        entropy             = distribute.entropy() #entropy = uncertain percentage
+        cstate_reward       = self.network_critic(states)
         
         #if dimension can squeeze then tensor 3d to 2d.
         #EX: squeeze tensor[2,1,3] become to tensor[2,3]
-        return critic_actlogprobs, torch.squeeze(critic_value), entropy
+        return critic_actlogprobs, torch.squeeze(cstate_reward), entropy
         
 class CPPO:
     def __init__(self, dim_states, dim_acts, h_neurons, lr, gamma, train_epochs, eps_clip, betas):
@@ -132,7 +132,7 @@ class CPPO:
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             # Evaluating old actions and values :
-            critic_actlogprobs, critic_value, entropy = self.policy_next.calculation(curraccu_states, curraccu_actions)
+            critic_actlogprobs, cstate_reward, entropy = self.policy_next.calculation(curraccu_states, curraccu_actions)
 
             # Finding the ratio (pi_theta / pi_theta__old):
             # log(critic) - log(curraccu) = log(critic/curraccu)
@@ -140,10 +140,13 @@ class CPPO:
             ratios = torch.exp(critic_actlogprobs - curraccu_logprobs.detach())
 
             # Finding Surrogate Loss:
-            advantages = curraccu_stdscore - critic_value.detach()
+            # R = (rewards-rewards.mean)/rewards.std
+            # critic_state_reward   = network_critic(curraccu_states)
+            # advantages            = R - critic_state_reward
+            advantages = curraccu_stdscore - cstate_reward.detach() #Q - V
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
-            loss = -torch.min(surr1, surr2) + 0.5*self.mseLoss(critic_value, curraccu_stdscore) - 0.01*entropy
+            loss = -torch.min(surr1, surr2) + 0.5*self.mseLoss(cstate_reward, curraccu_stdscore) - 0.01*entropy
 
             # take gradient step
             self.optimizer.zero_grad()
@@ -191,13 +194,13 @@ if __name__ == '__main__':
 
     # training loop
     for i_episode in range(1, max_episodes+1):
-        estates = env.reset() #init state value to matrix
+        envstate = env.reset() #init state value to matrix
         for t in range(max_timesteps):
             timestep += 1
 
             # Running policy_old:
-            action = ppo.policy_curr.interact(estates, gamedata)
-            estates, reward, done, _ = env.step(action)
+            action = ppo.policy_curr.interact(envstate, gamedata)
+            envstate, reward, done, _ = env.step(action)
 
             # one reward R(τ) = τ(a|s)R(a,s) in a certain state select an action and return the reward
             gamedata.rewards.append(reward)
