@@ -32,7 +32,7 @@ class Actor_Critic(nn.Module):
                                             nn.Linear(32, dim_acts),
                                             nn.Tanh()  )
         # network_value
-        self.network_value = nn.Sequential( nn.Linear(dim_states, 64),
+        self.network_critic = nn.Sequential(nn.Linear(dim_states, 64),
                                             nn.Tanh(),
                                             nn.Linear(64, 32),
                                             nn.Tanh(),
@@ -66,9 +66,10 @@ class Actor_Critic(nn.Module):
         action_logprobs = distribute.log_prob(actions)
         # entropy is uncertain percentage, value higher mean uncertain more
         entropy         = distribute.entropy()
-        cstate_reward   = self.network_value(states)
+        #cstate_value    = self.network_critic(states)
         
-        return action_logprobs, torch.squeeze(cstate_reward), entropy
+        #return action_logprobs, torch.squeeze(cstate_value), entropy
+        return action_logprobs, entropy
 
 class CPPO:
     def __init__(self, dim_states, dim_acts, action_std, lr, gamma, train_epochs, eps_clip, betas):
@@ -84,7 +85,7 @@ class CPPO:
         self.policy_curr = Actor_Critic(dim_states, dim_acts, action_std).double().to(device)
         self.policy_curr.load_state_dict(self.policy_next.state_dict())
 
-        self.MseLoss = nn.MSELoss()
+        self.MseLoss = nn.MSELoss(reduction='mean')
 
     #def select_action(self, estates, gamedata):
     #    tstates = torch.FloatTensor(estates.reshape(1, -1)).double().to(device)
@@ -100,28 +101,38 @@ class CPPO:
             discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
 
-        # Normalizing the rewards:
-        rewards             = torch.tensor(rewards).double().to(device)
-        curraccu_stdscore   = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
+        rewards = torch.tensor(rewards).double().to(device)
 
         # convert list to tensor
-        curr_states      = torch.squeeze(torch.stack(gamedata.states).double().to(device), 1).detach()
-        curr_actions     = torch.squeeze(torch.stack(gamedata.actions).double().to(device), 1).detach()
-        curr_logprobs    = torch.squeeze(torch.stack(gamedata.logprobs).double().to(device), 1).detach()
+        curr_states     = torch.squeeze(torch.stack(gamedata.states).double().to(device), 1).detach()
+        curr_actions    = torch.squeeze(torch.stack(gamedata.actions).double().to(device), 1).detach()
+        curr_logprobs   = torch.squeeze(torch.stack(gamedata.logprobs).double().to(device), 1).detach()
+
+        '''refer to a2c-ppo should modify like this
+           advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
+           advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
+        #cstate_value is fixed
+        cstate_value    = self.policy_next.network_critic(curr_states)
+        cstate_value    = torch.squeeze(cstate_value)
+        qsa_sub_vs      = rewards - cstate_value.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
+        advantages      = (qsa_sub_vs - qsa_sub_vs.mean()) / (qsa_sub_vs.std() + 1e-5)
 
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             #cstate_value is V(s) in A3C theroy. critic network is another actor input state
-            critic_actlogprobs, cstate_reward, entropy = self.policy_next.calculation(curr_states, curr_actions)
+            #critic_actlogprobs, cstate_value, entropy = self.policy_next.calculation(curr_states, curr_actions)
+            critic_actlogprobs, entropy = self.policy_next.calculation(curr_states, curr_actions)
 
             # Finding the ratio (pi_theta / pi_theta__old):
             ratios = torch.exp(critic_actlogprobs - curr_logprobs.detach())
 
             # Finding Surrogate Loss:
-            advantages = curraccu_stdscore - cstate_reward.detach()
+            #advantages = curr_stdscore - cstate_value.detach()
             surr1 = ratios * advantages
             surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
-            loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(cstate_reward, curraccu_stdscore) - 0.01*entropy
+
+            # mseLoss is Mean Square Error = (target - output)^2
+            loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(rewards, cstate_value.detach()) - 0.01*entropy
 
             # take gradient step
             self.optimizer.zero_grad()

@@ -95,13 +95,13 @@ class Actor_Critic(nn.Module):
         critic_actprobs     = self.network_act(states) #each current with one action probility
         distribute          = torch.distributions.Categorical(critic_actprobs)
         critic_actlogprobs  = distribute.log_prob(actions)
-        # entropy is uncertain percentage, value higher mean uncertain more
-        entropy             = distribute.entropy()
-        cstate_value        = self.network_critic(states)   #cstate_value is V(s) in A3C theroy
+        entropy             = distribute.entropy() # entropy is uncertain percentage, value higher mean uncertain more
+        #cstate_value        = self.network_critic(states)   #cstate_value is V(s) in A3C theroy
         
         #if dimension can squeeze then tensor 3d to 2d.
         #EX: squeeze tensor[2,1,3] become to tensor[2,3]
-        return critic_actlogprobs, torch.squeeze(cstate_value), entropy
+        #return critic_actlogprobs, torch.squeeze(cstate_value), entropy
+        return critic_actlogprobs, entropy
         
 class CPPO:
     def __init__(self, dim_states, dim_acts, h_neurons, lr, gamma, train_epochs, eps_clip, betas):
@@ -117,7 +117,7 @@ class CPPO:
         self.policy_curr    = Actor_Critic(dim_states, dim_acts, h_neurons).double().to(device)
         self.policy_curr.load_state_dict(self.policy_next.state_dict())
 
-        self.mseLoss        = nn.MSELoss()
+        self.mseLoss        = nn.MSELoss(reduction='mean')
     
     def train_update(self, gamedata):
         # Monte Carlo estimate of state rewards:
@@ -131,41 +131,50 @@ class CPPO:
             discounted_reward = reward + (self.gamma * discounted_reward)
             rewards.insert(0, discounted_reward)
 
-        # rewards is Q(s,a) interact with game
         rewards = torch.tensor(rewards).double().to(device)
+
         '''rewards.mean() is E[R(τ)]
         rewards.std on torch is {1/(n-1) * Σ(x - x_average)} ** 0.5  (x ** 0.5 = x^0.5)
         1e-5 = 0.00001 which avoid rewards.std() is zero
-        (Rewards - average_R) / (standard_R + 0.00001) is standard score'''
-        #rewards    = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
-        curraccu_stdscore   = (rewards - rewards.mean()) / (rewards.std() + 1e-5) #Q(s,a)
+        (Rewards - average_R) / (standard_R + 0.00001) is standard score
+        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)'''
+        # should modify
+        #curraccu_stdscore   = (rewards - rewards.mean()) / (rewards.std() + 1e-5) #Q(s,a)
 
         # convert list to tensor
         # torch.stack is combine many tensor 1D to 2D
-        curraccu_states     = torch.stack(gamedata.states).double().to(device).detach()
-        curraccu_actions    = torch.stack(gamedata.actions).double().to(device).detach()
-        curraccu_logprobs   = torch.stack(gamedata.actoflogprobs).double().to(device).detach()
+        curr_states     = torch.stack(gamedata.states).double().to(device).detach()
+        curr_actions    = torch.stack(gamedata.actions).double().to(device).detach()
+        curr_logprobs   = torch.stack(gamedata.actoflogprobs).double().to(device).detach()
+
+        # critic_state_reward   = network_critic(curraccu_states)
+        # advantages            = R - critic_state_value(reward)
+        '''refer to a2c-ppo should modify like this
+           advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
+           advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
+        # cstate_value is fixed
+        cstate_value    = self.policy_next.network_critic(curr_states)
+        cstate_value    = torch.squeeze(cstate_value)
+        qsa_sub_vs      = rewards - cstate_value.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
+        advantages      = (qsa_sub_vs - qsa_sub_vs.mean()) / (qsa_sub_vs.std() + 1e-5)
 
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             #cstate_value is V(s) in A3C theroy. critic network is another actor input state
-            critic_actlogprobs, cstate_value, entropy = self.policy_next.calculation(curraccu_states, curraccu_actions)
+            #critic_actlogprobs, cstate_value, entropy = self.policy_next.calculation(curraccu_states, curraccu_actions)
+            critic_actlogprobs, entropy = self.policy_next.calculation(curr_states, curr_actions)
 
             # Finding the ratio (pi_theta / pi_theta__old):
+            ratios = torch.exp(critic_actlogprobs - curr_logprobs.detach())
+
             # log(critic) - log(curraccu) = log(critic/curraccu)
             # ratios = e^log(critic/curraccu)
-            ratios = torch.exp(critic_actlogprobs - curraccu_logprobs.detach())
-
-            # Finding Surrogate Loss:
-            # R = (rewards-rewards.mean)/rewards.std
-            # critic_state_reward   = network_critic(curraccu_states)
-            # advantages            = R - critic_state_value(reward)
-            advantages  = curraccu_stdscore - cstate_value.detach() #A(s,a) => Q(s,a) - V(s)
+            #advantages = curr_stdscore - cstate_value.detach()
             surr1       = ratios * advantages
             surr2       = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
 
             # mseLoss is Mean Square Error = (target - output)^2
-            loss        = -torch.min(surr1, surr2) + 0.5*self.mseLoss(cstate_value, curraccu_stdscore) - 0.01*entropy
+            loss        = -torch.min(surr1, surr2) + 0.5*self.mseLoss(rewards, cstate_value.detach()) - 0.01*entropy
 
             # take gradient step
             self.optimizer.zero_grad()
@@ -182,13 +191,13 @@ if __name__ == '__main__':
     render          = False
     solved_reward   = 230           # stop training if reach avg_reward > solved_reward
     log_interval    = 20            # print avg reward in the interval
-    h_neurons       = 64  # number of variables in hidden layer
+    h_neurons       = 64            # number of variables in hidden layer
     max_episodes    = 10000         # max training episodes
     max_timesteps   = 1500          # max timesteps in one episode
-    update_timestep = 4000          # train_update policy every n timesteps
-    train_epochs    = 40  # train_update policy for epochs
+    update_timestep = 2000          # train_update policy every n timesteps
+    train_epochs    = 4             # train_update policy for epochs
     gamma           = 0.99          # discount factor
-    lr              = 0.0005        # learning rate
+    lr              = 0.001         # learning rate
     eps_clip        = 0.2           # clip parameter for PPO2
     betas           = (0.9, 0.999)  # Adam β
     random_seed     = None
