@@ -182,10 +182,10 @@ if __name__ == '__main__':
     render          = False
     solved_reward   = 230           # stop training if reach avg_reward > solved_reward
     log_interval    = 20            # print avg reward in the interval
-    max_episodes    = 50000         # max training episodes
-    max_timesteps   = 300           # max timesteps in one episode
-    h_neurons       = 64            # number of variables in hidden layer
-    update_timestep = 2000          # train_update policy every n timesteps
+    h_neurons       = 64  # number of variables in hidden layer
+    max_episodes    = 10000         # max training episodes
+    max_timesteps   = 1500          # max timesteps in one episode
+    update_timestep = 4000          # train_update policy every n timesteps
     gamma           = 0.99          # discount factor
     train_epochs    = 40            # train_update policy for epochs
     lr              = 0.0005        # learning rate
