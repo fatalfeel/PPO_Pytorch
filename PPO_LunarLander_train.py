@@ -187,7 +187,7 @@ if __name__ == '__main__':
     h_neurons       = 64            # number of variables in hidden layer
     update_timestep = 2000          # train_update policy every n timesteps
     gamma           = 0.99          # discount factor
-    train_epochs    = 4             # train_update policy for epochs
+    train_epochs    = 40            # train_update policy for epochs
     lr              = 0.0005        # learning rate
     eps_clip        = 0.2           # clip parameter for PPO2
     betas           = (0.9, 0.999)  # Adam β
