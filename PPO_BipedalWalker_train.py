@@ -38,15 +38,15 @@ class Actor_Critic(nn.Module):
                                             nn.Tanh(),
                                             nn.Linear(32, 1) )
         
-        self.action_var = torch.full((dim_acts,), action_std*action_std).to(device)
+        self.action_var = torch.full((dim_acts,), action_std*action_std).double().to(device)
         
     def forward(self):
         raise NotImplementedError
     
     def interact(self, envstate, gamedata):
-        torchstate      = torch.FloatTensor(envstate.reshape(1, -1)).to(device)
+        torchstate      = torch.FloatTensor(envstate.reshape(1, -1)).double().to(device)
         action_mean     = self.network_act(torchstate)
-        cov_mat         = torch.diag(self.action_var).to(device)
+        cov_mat         = torch.diag(self.action_var).double().to(device)
         dist            = torch.distributions.MultivariateNormal(action_mean, cov_mat)
         action          = dist.sample()
         action_logprob  = dist.log_prob(action)
@@ -61,7 +61,7 @@ class Actor_Critic(nn.Module):
     def calculation(self, states, actions):
         action_mean     = self.network_act(states)
         action_var      = self.action_var.expand_as(action_mean)
-        cov_mat         = torch.diag_embed(action_var).to(device)
+        cov_mat         = torch.diag_embed(action_var).double().to(device)
         distribute      = torch.distributions.MultivariateNormal(action_mean, cov_mat)
         action_logprobs = distribute.log_prob(actions)
         # entropy is uncertain percentage, value higher mean uncertain more
@@ -78,16 +78,16 @@ class CPPO:
         self.eps_clip       = eps_clip
         self.train_epochs   = train_epochs
         
-        self.policy_next    = Actor_Critic(dim_states, dim_acts, action_std).to(device)
+        self.policy_next    = Actor_Critic(dim_states, dim_acts, action_std).double().to(device)
         self.optimizer      = torch.optim.Adam(self.policy_next.parameters(), lr=lr, betas=betas)
 
-        self.policy_curr = Actor_Critic(dim_states, dim_acts, action_std).to(device)
+        self.policy_curr = Actor_Critic(dim_states, dim_acts, action_std).double().to(device)
         self.policy_curr.load_state_dict(self.policy_next.state_dict())
 
         self.MseLoss = nn.MSELoss()
 
     #def select_action(self, estates, gamedata):
-    #    tstates = torch.FloatTensor(estates.reshape(1, -1)).to(device)
+    #    tstates = torch.FloatTensor(estates.reshape(1, -1)).double().to(device)
     #    return self.policy_curr.interact(tstates, gamedata).cpu().data.numpy().flatten()
 
     def train_update(self, gamedata):
@@ -101,13 +101,13 @@ class CPPO:
             rewards.insert(0, discounted_reward)
 
         # Normalizing the rewards:
-        rewards             = torch.tensor(rewards, dtype=torch.float32).to(device)
+        rewards             = torch.tensor(rewards).double().to(device)
         curraccu_stdscore   = (rewards - rewards.mean()) / (rewards.std() + 1e-5)
 
         # convert list to tensor
-        curr_states      = torch.squeeze(torch.stack(gamedata.states).to(device), 1).detach()
-        curr_actions     = torch.squeeze(torch.stack(gamedata.actions).to(device), 1).detach()
-        curr_logprobs    = torch.squeeze(torch.stack(gamedata.logprobs), 1).to(device).detach()
+        curr_states      = torch.squeeze(torch.stack(gamedata.states).double().to(device), 1).detach()
+        curr_actions     = torch.squeeze(torch.stack(gamedata.actions).double().to(device), 1).detach()
+        curr_logprobs    = torch.squeeze(torch.stack(gamedata.logprobs).double().to(device), 1).detach()
 
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):

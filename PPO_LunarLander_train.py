@@ -79,7 +79,7 @@ class Actor_Critic(nn.Module):
 
     #policy_curr.interact will call
     def interact(self, envstate, gamedata):
-        torchstate      = torch.from_numpy(envstate).float().to(device)
+        torchstate      = torch.from_numpy(envstate).double().to(device)
         action_probs    = self.network_act(torchstate) #tau(a|s) = P(a,s) 8 elements corresponds to one action
         distribute      = torch.distributions.Categorical(action_probs) #category distribution
         action          = distribute.sample()
@@ -111,10 +111,10 @@ class CPPO:
         self.eps_clip       = eps_clip
         self.train_epochs   = train_epochs
 
-        self.policy_next    = Actor_Critic(dim_states, dim_acts, h_neurons).to(device)
+        self.policy_next    = Actor_Critic(dim_states, dim_acts, h_neurons).double().to(device)
         self.optimizer      = torch.optim.Adam(self.policy_next.parameters(), lr=lr, betas=betas)
 
-        self.policy_curr    = Actor_Critic(dim_states, dim_acts, h_neurons).to(device)
+        self.policy_curr    = Actor_Critic(dim_states, dim_acts, h_neurons).double().to(device)
         self.policy_curr.load_state_dict(self.policy_next.state_dict())
 
         self.mseLoss        = nn.MSELoss()
@@ -132,7 +132,7 @@ class CPPO:
             rewards.insert(0, discounted_reward)
 
         # rewards is Q(s,a) interact with game
-        rewards = torch.tensor(rewards, dtype=torch.float32).to(device)
+        rewards = torch.tensor(rewards).double().to(device)
         '''rewards.mean() is E[R(τ)]
         rewards.std on torch is {1/(n-1) * Σ(x - x_average)} ** 0.5  (x ** 0.5 = x^0.5)
         1e-5 = 0.00001 which avoid rewards.std() is zero
@@ -142,9 +142,9 @@ class CPPO:
 
         # convert list to tensor
         # torch.stack is combine many tensor 1D to 2D
-        curraccu_states     = torch.stack(gamedata.states).to(device).detach()
-        curraccu_actions    = torch.stack(gamedata.actions).to(device).detach()
-        curraccu_logprobs   = torch.stack(gamedata.actoflogprobs).to(device).detach()
+        curraccu_states     = torch.stack(gamedata.states).double().to(device).detach()
+        curraccu_actions    = torch.stack(gamedata.actions).double().to(device).detach()
+        curraccu_logprobs   = torch.stack(gamedata.actoflogprobs).double().to(device).detach()
 
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
