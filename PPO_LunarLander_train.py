@@ -105,7 +105,7 @@ class Actor_Critic(nn.Module):
         
 class CPPO:
     def __init__(self, dim_states, dim_acts, h_neurons, lr, gamma, train_epochs, eps_clip, betas):
-        self.lr = lr
+        self.lr             = lr
         self.betas          = betas
         self.gamma          = gamma
         self.eps_clip       = eps_clip

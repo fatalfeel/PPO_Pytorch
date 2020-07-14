@@ -78,7 +78,7 @@ class CPPO:
         self.eps_clip       = eps_clip
         self.train_epochs   = train_epochs
         
-        self.policy_next         = Actor_Critic(dim_states, dim_acts, action_std).to(device)
+        self.policy_next    = Actor_Critic(dim_states, dim_acts, action_std).to(device)
         self.optimizer      = torch.optim.Adam(self.policy_next.parameters(), lr=lr, betas=betas)
 
         self.policy_curr = Actor_Critic(dim_states, dim_acts, action_std).to(device)
