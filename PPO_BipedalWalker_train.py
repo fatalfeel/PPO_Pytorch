@@ -44,14 +44,14 @@ class Actor_Critic(nn.Module):
         raise NotImplementedError
     
     def interact(self, envstate, gamedata):
-        tstates         = torch.FloatTensor(envstate.reshape(1, -1)).to(device)
-        action_mean     = self.network_act(tstates)
+        torchstate      = torch.FloatTensor(envstate.reshape(1, -1)).to(device)
+        action_mean     = self.network_act(torchstate)
         cov_mat         = torch.diag(self.action_var).to(device)
         dist            = torch.distributions.MultivariateNormal(action_mean, cov_mat)
         action          = dist.sample()
         action_logprob  = dist.log_prob(action)
         
-        gamedata.states.append(tstates)
+        gamedata.states.append(torchstate)
         gamedata.actions.append(action)
         gamedata.logprobs.append(action_logprob)
 
