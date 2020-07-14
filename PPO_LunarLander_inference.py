@@ -9,23 +9,20 @@ if __name__ == '__main__':
     ############## Hyperparameters ##############
     env_name = "LunarLander-v2"
     # creating environment
+    render          = True
+    save_gif        = False
     env             = gym.make(env_name)
     dim_states      = env.observation_space.shape[0]
     dim_acts        = 4
-    render          = False
-    max_timesteps   = 500
-    h_neurons       = 64           # number of variables in hidden layer
-    lr              = 0.0007
+    n_episodes      = 10000
+    h_neurons       = 64                # number of variables in hidden layer
+    max_timesteps   = 200               # move 200 times rest game
+    lr              = 0.0005
+    train_epochs    = 40                # update policy for K epochs
+    gamma           = 0.99              # discount factor
     betas           = (0.9, 0.999)
-    gamma           = 0.99                # discount factor
-    train_epochs    = 4                # update policy for K epochs
-    eps_clip        = 0.2              # clip parameter for PPO
+    eps_clip        = 0.2               # clip parameter for PPO
     #############################################
-
-    n_episodes      = 6
-    max_timesteps   = 300
-    render          = True
-    save_gif        = False
 
     gamedata    = GameContent()
     ppo         = CPPO(dim_states, dim_acts, h_neurons, lr, gamma, train_epochs, eps_clip, betas)
