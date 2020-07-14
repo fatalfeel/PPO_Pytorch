@@ -88,7 +88,7 @@ class Actor_Critic(nn.Module):
         gamedata.actions.append(action)
         gamedata.actoflogprobs.append(distribute.log_prob(action)) #the action number corresponds to the action_probs into log
         
-        return action.item() #return action_probs index corresponds to key 1,2,3,4
+        return action.detach().item() #return action_probs index corresponds to key 1,2,3,4
 
     #policy_next.calculation will call
     def calculation(self, states, actions):
@@ -245,6 +245,9 @@ if __name__ == '__main__':
             print("########## Solved! ##########")
             torch.save(ppo.policy_next.state_dict(), './PPO_{}.pth'.format(env_name))
             break
+
+        if i_episode % 500 == 0:
+            torch.save(ppo.policy_next.state_dict(), './PPO_{}_episode_{}.pth'.format(env_name, i_episode))
             
         # logging
         if i_episode % log_interval == 0:
