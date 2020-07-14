@@ -55,6 +55,7 @@ class Actor_Critic(nn.Module):
         gamedata.actions.append(action)
         gamedata.logprobs.append(action_logprob)
 
+        #flatten do 2d to 1d
         return action.detach().cpu().data.numpy().flatten()
 
     def calculation(self, states, actions):
