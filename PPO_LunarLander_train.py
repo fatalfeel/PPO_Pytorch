@@ -196,8 +196,8 @@ if __name__ == '__main__':
     max_timesteps   = 1500          # max timesteps in one episode
     update_timestep = 2000          # train_update policy every n timesteps
     train_epochs    = 4             # train_update policy for epochs
+    lr              = 0.0001        # learning rate
     gamma           = 0.99          # discount factor
-    lr              = 0.001         # learning rate
     eps_clip        = 0.2           # clip parameter for PPO2
     betas           = (0.9, 0.999)  # Adam β
     random_seed     = None
