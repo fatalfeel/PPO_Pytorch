@@ -65,9 +65,9 @@ class Actor_Critic(nn.Module):
         distribute          = torch.distributions.MultivariateNormal(action_mean, cov_mat)
         critic_actlogprobs  = distribute.log_prob(actions)
         entropy             = distribute.entropy() #entropy is uncertain percentage, value higher mean uncertain more
-        critic_values       = self.network_critic(states)
+        next_critic_values  = self.network_critic(states)
         
-        return critic_actlogprobs, torch.squeeze(critic_values), entropy
+        return critic_actlogprobs, torch.squeeze(next_critic_values), entropy
         #return critic_actlogprobs, entropy
 
 class CPPO:
@@ -107,19 +107,20 @@ class CPPO:
         curr_actions    = torch.squeeze(torch.stack(gamedata.actions).double().to(device), 1).detach()
         curr_logprobs   = torch.squeeze(torch.stack(gamedata.logprobs).double().to(device), 1).detach()
 
+        # critic_state_reward   = network_critic(curraccu_states)
+        '''refer to a2c-ppo should modify like this
+           advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
+           advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
+        critic_vpi  = self.policy_next.network_critic(curr_states)
+        critic_vpi  = torch.squeeze(critic_vpi)
+        qsa_sub_vs  = rewards - critic_vpi.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
+        advantages  = (qsa_sub_vs - qsa_sub_vs.mean()) / (qsa_sub_vs.std() + 1e-5)
+
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             #cstate_value is V(s) in A3C theroy. critic network is another actor input state
-            critic_actlogprobs, critic_values, entropy = self.policy_next.calculation(curr_states, curr_actions)
+            critic_actlogprobs, next_critic_values, entropy = self.policy_next.calculation(curr_states, curr_actions)
             #critic_actlogprobs, entropy = self.policy_next.calculation(curr_states, curr_actions)
-
-            '''refer to a2c-ppo should modify like this
-                       advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
-                       advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
-            #cstate_value = self.policy_next.network_critic(curr_states)
-            #cstate_value = torch.squeeze(cstate_value)
-            qsa_sub_vs = rewards - critic_values #A(s,a) => Q(s,a) - V(s), V(s) is critic
-            advantages = (qsa_sub_vs - qsa_sub_vs.mean()) / (qsa_sub_vs.std() + 1e-5)
 
             # Finding the ratio (pi_theta / pi_theta__old):
             # log(critic) - log(curraccu) = log(critic/curraccu)
@@ -131,7 +132,7 @@ class CPPO:
             surr2   = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
 
             # mseLoss is Mean Square Error = (target - output)^2
-            loss    = -torch.min(surr1, surr2) + 0.5*self.MseLoss(rewards, critic_values) - 0.01*entropy
+            loss    = -torch.min(surr1, surr2) + 0.5*self.MseLoss(rewards, next_critic_values) - 0.01*entropy
 
             # take gradient step
             self.optimizer.zero_grad()
