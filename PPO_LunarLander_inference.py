@@ -15,7 +15,7 @@ if __name__ == '__main__':
     h_neurons       = 64                # number of variables in hidden layer
     max_timesteps   = 400               # move 200 times rest game
     train_epochs    = 4                 # update policy for K epochs
-    lr              = 0.0001
+    lr              = 0.0005
     gamma           = 0.99              # discount factor
     eps_clip        = 0.2               # clip parameter for PPO
     betas           = (0.9, 0.999)

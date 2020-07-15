@@ -31,7 +31,6 @@ class GameContent:
     def __init__(self):
         self.actions        = []
         self.states         = []
-        self.critic_values  = []
         self.rewards        = []
         self.actoflogprobs  = []
         self.is_terminals   = []
@@ -39,7 +38,6 @@ class GameContent:
     def ReleaseData(self):
         del self.actions[:]
         del self.states[:]
-        del self.critic_values[:]
         del self.rewards[:]
         del self.actoflogprobs[:]
         del self.is_terminals[:]
@@ -85,10 +83,8 @@ class Actor_Critic(nn.Module):
         action_probs    = self.network_act(torchstate) #tau(a|s) = P(a,s) 8 elements corresponds to one action
         distribute      = torch.distributions.Categorical(action_probs) #category distribution
         action          = distribute.sample()
-        critic_value    = self.network_critic(torchstate)
         
         gamedata.states.append(torchstate)
-        gamedata.critic_values.append(critic_value)
         gamedata.actions.append(action)
         gamedata.actoflogprobs.append(distribute.log_prob(action)) #the action number corresponds to the action_probs into log
         
@@ -147,25 +143,24 @@ class CPPO:
 
         # convert list to tensor
         # torch.stack is combine many tensor 1D to 2D
-        curr_states         = torch.stack(gamedata.states).double().to(device).detach()
-        curr_critic_values  = torch.stack(gamedata.critic_values).double().to(device).detach()
-        curr_actions        = torch.stack(gamedata.actions).double().to(device).detach()
-        curr_logprobs       = torch.stack(gamedata.actoflogprobs).double().to(device).detach()
-
-        # critic_state_reward   = network_critic(curraccu_states)
-        '''refer to a2c-ppo should modify like this
-           advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
-           advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
-        # cstate_value = self.policy_next.network_critic(curr_states)
-        # cstate_value = torch.squeeze(cstate_value)
-        qsa_sub_vs = rewards - curr_critic_values.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
-        advantages = (qsa_sub_vs - qsa_sub_vs.mean()) / (qsa_sub_vs.std() + 1e-5)
+        curr_states     = torch.stack(gamedata.states).double().to(device).detach()
+        curr_actions    = torch.stack(gamedata.actions).double().to(device).detach()
+        curr_logprobs   = torch.stack(gamedata.actoflogprobs).double().to(device).detach()
 
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             #cstate_value is V(s) in A3C theroy. critic network is another actor input state
-            critic_actlogprobs, next_critic_values, entropy = self.policy_next.calculation(curr_states, curr_actions)
+            critic_actlogprobs, critic_values, entropy = self.policy_next.calculation(curr_states, curr_actions)
             #critic_actlogprobs, entropy = self.policy_next.calculation(curr_states, curr_actions)
+
+            # critic_state_reward   = network_critic(curraccu_states)
+            '''refer to a2c-ppo should modify like this
+               advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
+               advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
+            #cstate_value = self.policy_next.network_critic(curr_states)
+            #cstate_value = torch.squeeze(cstate_value)
+            qsa_sub_vs = rewards - critic_values #A(s,a) => Q(s,a) - V(s), V(s) is critic
+            advantages = (qsa_sub_vs - qsa_sub_vs.mean()) / (qsa_sub_vs.std() + 1e-5)
 
             # Finding the ratio (pi_theta / pi_theta__old):
             # log(critic) - log(curraccu) = log(critic/curraccu)
@@ -177,7 +172,7 @@ class CPPO:
             surr2   = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
 
             # mseLoss is Mean Square Error = (target - output)^2
-            loss    = -torch.min(surr1, surr2) + 0.5*self.mseLoss(rewards, next_critic_values) - 0.01*entropy
+            loss    = -torch.min(surr1, surr2) + 0.5*self.mseLoss(rewards, critic_values) - 0.01*entropy
 
             # take gradient step
             self.optimizer.zero_grad()
@@ -199,7 +194,7 @@ if __name__ == '__main__':
     max_timesteps   = 1500          # max timesteps in one episode
     update_timestep = 2000          # train_update policy every n timesteps
     train_epochs    = 4             # train_update policy for epochs
-    lr              = 0.0001        # learning rate
+    lr              = 0.0005        # learning rate
     gamma           = 0.99          # discount factor
     eps_clip        = 0.2           # clip parameter for PPO2
     betas           = (0.9, 0.999)  # Adam β
