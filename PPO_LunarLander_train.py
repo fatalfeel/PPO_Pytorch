@@ -31,6 +31,7 @@ class GameContent:
     def __init__(self):
         self.actions        = []
         self.states         = []
+        self.critic_values  = []
         self.rewards        = []
         self.actoflogprobs  = []
         self.is_terminals   = []
@@ -38,6 +39,7 @@ class GameContent:
     def ReleaseData(self):
         del self.actions[:]
         del self.states[:]
+        del self.critic_values[:]
         del self.rewards[:]
         del self.actoflogprobs[:]
         del self.is_terminals[:]
@@ -83,8 +85,10 @@ class Actor_Critic(nn.Module):
         action_probs    = self.network_act(torchstate) #tau(a|s) = P(a,s) 8 elements corresponds to one action
         distribute      = torch.distributions.Categorical(action_probs) #category distribution
         action          = distribute.sample()
+        critic_value    = self.network_critic(torchstate)
         
         gamedata.states.append(torchstate)
+        gamedata.critic_values.append(critic_value)
         gamedata.actions.append(action)
         gamedata.actoflogprobs.append(distribute.log_prob(action)) #the action number corresponds to the action_probs into log
         
@@ -96,11 +100,11 @@ class Actor_Critic(nn.Module):
         distribute          = torch.distributions.Categorical(critic_actprobs)
         critic_actlogprobs  = distribute.log_prob(actions)
         entropy             = distribute.entropy() # entropy is uncertain percentage, value higher mean uncertain more
-        cstate_value        = self.network_critic(states)   #cstate_value is V(s) in A3C theroy
+        critic_values       = self.network_critic(states)   #cstate_value is V(s) in A3C theroy
         
         #if dimension can squeeze then tensor 3d to 2d.
         #EX: squeeze tensor[2,1,3] become to tensor[2,3]
-        return critic_actlogprobs, torch.squeeze(cstate_value), entropy
+        return critic_actlogprobs, torch.squeeze(critic_values), entropy
         #return critic_actlogprobs, entropy
         
 class CPPO:
@@ -143,24 +147,25 @@ class CPPO:
 
         # convert list to tensor
         # torch.stack is combine many tensor 1D to 2D
-        curr_states     = torch.stack(gamedata.states).double().to(device).detach()
-        curr_actions    = torch.stack(gamedata.actions).double().to(device).detach()
-        curr_logprobs   = torch.stack(gamedata.actoflogprobs).double().to(device).detach()
+        curr_states         = torch.stack(gamedata.states).double().to(device).detach()
+        curr_critic_values  = torch.stack(gamedata.critic_values).double().to(device).detach()
+        curr_actions        = torch.stack(gamedata.actions).double().to(device).detach()
+        curr_logprobs       = torch.stack(gamedata.actoflogprobs).double().to(device).detach()
+
+        # critic_state_reward   = network_critic(curraccu_states)
+        '''refer to a2c-ppo should modify like this
+           advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
+           advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
+        # cstate_value = self.policy_next.network_critic(curr_states)
+        # cstate_value = torch.squeeze(cstate_value)
+        qsa_sub_vs = rewards - curr_critic_values.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
+        advantages = (qsa_sub_vs - qsa_sub_vs.mean()) / (qsa_sub_vs.std() + 1e-5)
 
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             #cstate_value is V(s) in A3C theroy. critic network is another actor input state
-            critic_actlogprobs, cstate_value, entropy = self.policy_next.calculation(curr_states, curr_actions)
+            critic_actlogprobs, next_critic_values, entropy = self.policy_next.calculation(curr_states, curr_actions)
             #critic_actlogprobs, entropy = self.policy_next.calculation(curr_states, curr_actions)
-
-            # critic_state_reward   = network_critic(curraccu_states)
-            '''refer to a2c-ppo should modify like this
-               advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
-               advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
-            #cstate_value = self.policy_next.network_critic(curr_states)
-            #cstate_value = torch.squeeze(cstate_value)
-            qsa_sub_vs = rewards - cstate_value #A(s,a) => Q(s,a) - V(s), V(s) is critic
-            advantages = (qsa_sub_vs - qsa_sub_vs.mean()) / (qsa_sub_vs.std() + 1e-5)
 
             # Finding the ratio (pi_theta / pi_theta__old):
             # log(critic) - log(curraccu) = log(critic/curraccu)
@@ -172,7 +177,7 @@ class CPPO:
             surr2   = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
 
             # mseLoss is Mean Square Error = (target - output)^2
-            loss    = -torch.min(surr1, surr2) + 0.5*self.mseLoss(rewards, cstate_value) - 0.01*entropy
+            loss    = -torch.min(surr1, surr2) + 0.5*self.mseLoss(rewards, next_critic_values) - 0.01*entropy
 
             # take gradient step
             self.optimizer.zero_grad()
