@@ -59,16 +59,16 @@ class Actor_Critic(nn.Module):
         return action.detach().cpu().data.numpy().flatten()
 
     def calculation(self, states, actions):
-        action_mean     = self.network_act(states)
-        action_var      = self.action_var.expand_as(action_mean)
-        cov_mat         = torch.diag_embed(action_var).double().to(device)
-        distribute      = torch.distributions.MultivariateNormal(action_mean, cov_mat)
-        action_logprobs = distribute.log_prob(actions)
-        entropy         = distribute.entropy() #entropy is uncertain percentage, value higher mean uncertain more
-        critic_values   = self.network_critic(states)
+        action_mean         = self.network_act(states)
+        action_var          = self.action_var.expand_as(action_mean)
+        cov_mat             = torch.diag_embed(action_var).double().to(device)
+        distribute          = torch.distributions.MultivariateNormal(action_mean, cov_mat)
+        critic_actlogprobs  = distribute.log_prob(actions)
+        entropy             = distribute.entropy() #entropy is uncertain percentage, value higher mean uncertain more
+        critic_values       = self.network_critic(states)
         
-        return action_logprobs, torch.squeeze(critic_values), entropy
-        #return action_logprobs, entropy
+        return critic_actlogprobs, torch.squeeze(critic_values), entropy
+        #return critic_actlogprobs, entropy
 
 class CPPO:
     def __init__(self, dim_states, dim_acts, action_std, lr, gamma, train_epochs, eps_clip, betas):
