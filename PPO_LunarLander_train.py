@@ -158,7 +158,7 @@ class CPPO:
 
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
-            #cstate_value is V(s) in A3C theroy. critic network is another actor input state
+            #cstate_value is V(s) in A3C theroy. critic network weights as an actor feed state out reward value
             critic_actlogprobs, next_critic_values, entropy = self.policy_next.calculation(curr_states, curr_actions)
             #critic_actlogprobs, entropy = self.policy_next.calculation(curr_states, curr_actions)
 
