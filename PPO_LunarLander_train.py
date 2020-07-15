@@ -96,7 +96,7 @@ class Actor_Critic(nn.Module):
         distribute          = torch.distributions.Categorical(critic_actprobs)
         critic_actlogprobs  = distribute.log_prob(actions)
         entropy             = distribute.entropy() # entropy is uncertain percentage, value higher mean uncertain more
-        next_critic_values  = self.network_critic(states)   #cstate_value is V(s) in A3C theroy
+        next_critic_values  = self.network_critic(states) #c_values is V(s) in A3C theroy
         
         #if dimension can squeeze then tensor 3d to 2d.
         #EX: squeeze tensor[2,1,3] become to tensor[2,3]
