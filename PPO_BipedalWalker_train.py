@@ -64,12 +64,11 @@ class Actor_Critic(nn.Module):
         cov_mat         = torch.diag_embed(action_var).double().to(device)
         distribute      = torch.distributions.MultivariateNormal(action_mean, cov_mat)
         action_logprobs = distribute.log_prob(actions)
-        # entropy is uncertain percentage, value higher mean uncertain more
-        entropy         = distribute.entropy()
-        #cstate_value    = self.network_critic(states)
+        entropy         = distribute.entropy() #entropy is uncertain percentage, value higher mean uncertain more
+        cstate_value    = self.network_critic(states)
         
-        #return action_logprobs, torch.squeeze(cstate_value), entropy
-        return action_logprobs, entropy
+        return action_logprobs, torch.squeeze(cstate_value), entropy
+        #return action_logprobs, entropy
 
 class CPPO:
     def __init__(self, dim_states, dim_acts, action_std, lr, gamma, train_epochs, eps_clip, betas):
@@ -108,31 +107,31 @@ class CPPO:
         curr_actions    = torch.squeeze(torch.stack(gamedata.actions).double().to(device), 1).detach()
         curr_logprobs   = torch.squeeze(torch.stack(gamedata.logprobs).double().to(device), 1).detach()
 
-        '''refer to a2c-ppo should modify like this
-           advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
-           advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
-        #cstate_value is fixed
-        cstate_value    = self.policy_next.network_critic(curr_states)
-        cstate_value    = torch.squeeze(cstate_value)
-        qsa_sub_vs      = rewards - cstate_value.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
-        advantages      = (qsa_sub_vs - qsa_sub_vs.mean()) / (qsa_sub_vs.std() + 1e-5)
-
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             #cstate_value is V(s) in A3C theroy. critic network is another actor input state
-            #critic_actlogprobs, cstate_value, entropy = self.policy_next.calculation(curr_states, curr_actions)
-            critic_actlogprobs, entropy = self.policy_next.calculation(curr_states, curr_actions)
+            critic_actlogprobs, cstate_value, entropy = self.policy_next.calculation(curr_states, curr_actions)
+            #critic_actlogprobs, entropy = self.policy_next.calculation(curr_states, curr_actions)
+
+            '''refer to a2c-ppo should modify like this
+                       advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
+                       advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
+            #cstate_value = self.policy_next.network_critic(curr_states)
+            #cstate_value = torch.squeeze(cstate_value)
+            qsa_sub_vs = rewards - cstate_value #A(s,a) => Q(s,a) - V(s), V(s) is critic
+            advantages = (qsa_sub_vs - qsa_sub_vs.mean()) / (qsa_sub_vs.std() + 1e-5)
 
             # Finding the ratio (pi_theta / pi_theta__old):
-            ratios = torch.exp(critic_actlogprobs - curr_logprobs.detach())
+            # log(critic) - log(curraccu) = log(critic/curraccu)
+            # ratios = e^log(critic/curraccu)
+            ratios  = torch.exp(critic_actlogprobs - curr_logprobs.detach())
 
-            # Finding Surrogate Loss:
             #advantages = curr_stdscore - cstate_value.detach()
-            surr1 = ratios * advantages
-            surr2 = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
+            surr1   = ratios * advantages
+            surr2   = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
 
             # mseLoss is Mean Square Error = (target - output)^2
-            loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(rewards, cstate_value.detach()) - 0.01*entropy
+            loss    = -torch.min(surr1, surr2) + 0.5*self.MseLoss(rewards, cstate_value) - 0.01*entropy
 
             # take gradient step
             self.optimizer.zero_grad()
@@ -148,14 +147,14 @@ if __name__ == '__main__':
     render          = False
     solved_reward   = 300           # stop training if avg_reward > solved_reward
     log_interval    = 20            # print avg reward in the interval
-    max_episodes    = 10000         # max training episodes
+    max_episodes    = 50000         # max training episodes
     max_timesteps   = 1500          # max timesteps in one episode
     update_timestep = 4000          # train_update policy every n timesteps
-    train_epochs    = 80  # train_update policy for K epochs
+    train_epochs    = 80            # train_update policy for K epochs
     action_std      = 0.5           # constant std for action distribution (Multivariate Normal)
-    gamma           = 0.99  # discount factor
-    lr              = 0.0001  # parameters for Adam optimizer
-    eps_clip        = 0.2  # clip parameter for CPPO
+    gamma           = 0.99          # discount factor
+    lr              = 0.0001        # parameters for Adam optimizer
+    eps_clip        = 0.2           # clip parameter for CPPO
     betas           = (0.9, 0.999)
     random_seed     = None
     #############################################
