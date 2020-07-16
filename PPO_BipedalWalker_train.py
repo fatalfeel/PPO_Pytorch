@@ -38,15 +38,15 @@ class Actor_Critic(nn.Module):
                                             nn.Tanh(),
                                             nn.Linear(32, 1) )
         
-        self.action_var = torch.full((dim_acts,), action_std*action_std).double().to(device)
+        self.action_var = torch.full((dim_acts,), action_std*action_std).double().to(device) #expand action_std^2 to 1d
         
     def forward(self):
         raise NotImplementedError
     
     def interact(self, envstate, gamedata):
-        torchstate      = torch.FloatTensor(envstate.reshape(1, -1)).double().to(device)
+        torchstate      = torch.FloatTensor(envstate.reshape(1, -1)).double().to(device) #reshape(1,-1) 1d to 2d
         action_mean     = self.network_act(torchstate)
-        cov_mat         = torch.diag(self.action_var).double().to(device)
+        cov_mat         = torch.diag(self.action_var).double().to(device) #transfer to matrix
         distribute      = torch.distributions.MultivariateNormal(action_mean, cov_mat)
         action          = distribute.sample()
         actlogprob      = distribute.log_prob(action)
