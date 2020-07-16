@@ -32,13 +32,13 @@ if __name__ == '__main__':
     directory   = "./preTrained/"
     filename    = "PPO_{}.pth".format(env_name)
     # map_location=torch.device('cpu') for cpu only if you have cuda then cancel it
-    ppo.policy_curr.load_state_dict(torch.load(directory+filename, map_location=torch.device('cpu')))
+    ppo.policy_ac.load_state_dict(torch.load(directory+filename, map_location=torch.device('cpu')))
     
     for ep in range(1, n_episodes+1):
         ep_reward = 0
         estates = env.reset()
         for t in range(max_timesteps):
-            action                      = ppo.policy_curr.interact(estates, gamedata)
+            action                      = ppo.policy_ac.interact(estates, gamedata)
             estates, reward, done, _    = env.step(action)
             ep_reward += reward
             if render:
