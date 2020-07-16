@@ -1,5 +1,9 @@
 # PPO-PyTorch
-PPO main source: https://github.com/nikhilbarhate99/PPO-PyTorch
+PPO source refering: 
+
+https://github.com/nikhilbarhate99/PPO-PyTorch
+
+https://github.com/ASzot/ppo-pytorch
 
 Gym main source: https://github.com/openai/gym/tree/master/gym
 
