@@ -87,7 +87,6 @@ class Actor_Critic(nn.Module):
 
         gamedata.states.append(torchstate)
         gamedata.actions.append(action)
-        #gamedata.actoflogprobs.append(distribute.log_prob(action))
         gamedata.actoflogprobs.append(actlogprob) #the action number corresponds to the action_probs into log
 
         return action.detach().item() #return action_probs index corresponds to key 1,2,3,4
