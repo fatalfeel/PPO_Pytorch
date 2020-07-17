@@ -8,7 +8,9 @@ https://github.com/ASzot/ppo-pytorch
 Gym main source: https://github.com/openai/gym/tree/master/gym
 
 Integrated PPO and Gym source:
+
 Modify some crash problem with weight and float
+
 Advantage function can not backpropagation fixed
 
 Preinstall
