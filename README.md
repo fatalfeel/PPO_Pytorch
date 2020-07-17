@@ -13,6 +13,8 @@ Modify some crash problem with weight and float
 
 Value function can not backpropagation fixed
 
+Remove redundant network
+
 Preinstall
 
 1.python3 version >=3.7
