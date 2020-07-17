@@ -12,16 +12,15 @@ if __name__ == '__main__':
     dim_states      = env.observation_space.shape[0]
     dim_acts        = env.action_space.shape[0]
     
-    n_episodes      = 3          # num of episodes to run
-    max_timesteps   = 1500    # max timesteps in one episode
-    render          = True           # render the environment
-    save_gif        = False        # png images are saved in gif folder
-
-    action_std      = 0.5        # constant std for action distribution (Multivariate Normal)
-    train_epochs    = 80           # update policy for K epochs
-    eps_clip        = 0.2          # clip parameter for CPPO
-    gamma           = 0.99            # discount factor
-    lr              = 0.0003             # parameters for Adam optimizer
+    n_episodes      = 10000         # num of episodes to run
+    max_timesteps   = 1500          # max timesteps in one episode
+    render          = True          # render the environment
+    save_gif        = False         # png images are saved in gif folder
+    train_epochs    = 40            # update policy for K epochs
+    action_std      = 0.5           # constant std for action distribution (Multivariate Normal)
+    gamma           = 0.99  # discount factor
+    lr              = 0.0001  # parameters for Adam optimizer
+    eps_clip        = 0.2           # clip parameter for CPPO
     betas           = (0.9, 0.999)
     #############################################
     
