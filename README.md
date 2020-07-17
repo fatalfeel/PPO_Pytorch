@@ -11,7 +11,7 @@ Integrated PPO and Gym source:
 
 Modify some crash problem with weight and float
 
-Value function can not backpropagation fixed
+Value function can not do backpropagation fixed
 
 Remove redundant network
 
