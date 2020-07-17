@@ -8,12 +8,12 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 class GameContent:
     def __init__(self):
-        self.actions = []
-        self.states = []
-        self.logprobs = []
-        self.rewards = []
-        self.is_terminals = []
-    
+        self.actions        = []
+        self.states         = []
+        self.logprobs       = []
+        self.rewards        = []
+        self.is_terminals   = []
+
     def clear_memory(self):
         del self.actions[:]
         del self.states[:]
@@ -37,20 +37,22 @@ class Actor_Critic(nn.Module):
                                             nn.Linear(64, 32),
                                             nn.Tanh(),
                                             nn.Linear(32, 1) )
-        
-        self.action_var = torch.full((dim_acts,), action_std*action_std).double().to(device) #expand action_std^2 to 1d
-        
+
+        #self.action_std = torch.full((dim_acts,), action_std*action_std).double().to(device)
+        self.action_std  = torch.full((dim_acts,), action_std).double().to(device) #standard deviations
+
     def forward(self):
         raise NotImplementedError
-    
+
     def interact(self, envstate, gamedata):
         torchstate      = torch.FloatTensor(envstate.reshape(1, -1)).double().to(device) #reshape(1,-1) 1d to 2d
-        action_mean     = self.network_act(torchstate)
-        cov_mat         = torch.diag(self.action_var).double().to(device) #transfer to matrix
-        distribute      = torch.distributions.MultivariateNormal(action_mean, cov_mat)
+        act_mu          = self.network_act(torchstate)
+        std_mat         = torch.diag(self.action_std).double().to(device) #transfer to matrix
+        #distribute     = torch.distributions.MultivariateNormal(action_mu, cov_mat)
+        distribute      = torch.distributions.MultivariateNormal(act_mu, scale_tril=std_mat) #act_mu=center, scale_tril=width
         action          = distribute.sample()
         actlogprob      = distribute.log_prob(action)
-        
+
         gamedata.states.append(torchstate)
         gamedata.actions.append(action)
         gamedata.logprobs.append(actlogprob)
@@ -59,10 +61,11 @@ class Actor_Critic(nn.Module):
         return action.detach().cpu().data.numpy().flatten()
 
     def calculation(self, states, actions):
-        action_mean         = self.network_act(states)
-        action_var          = self.action_var.expand_as(action_mean)
-        cov_mat             = torch.diag_embed(action_var).double().to(device)
-        distribute          = torch.distributions.MultivariateNormal(action_mean, cov_mat)
+        acts_mu             = self.network_act(states)
+        acts_std            = self.action_std.expand_as(acts_mu)
+        std_mat             = torch.diag_embed(acts_std).double().to(device)
+        #distribute         = torch.distributions.MultivariateNormal(action_mu, cov_mat)
+        distribute          = torch.distributions.MultivariateNormal(acts_mu, scale_tril=std_mat) #act_mu=center, scale_tril=width
         critic_actlogprobs  = distribute.log_prob(actions)
         entropy             = distribute.entropy() #entropy is uncertain percentage, value higher mean uncertain more
         next_critic_values  = self.network_critic(states) #c_values is V(s) in A3C theroy
@@ -86,7 +89,7 @@ class CPPO:
         self.gamma          = gamma
         self.eps_clip       = eps_clip
         self.train_epochs   = train_epochs
-        
+
         self.policy_ac      = Actor_Critic(dim_states, dim_acts, action_std).double().to(device)
         self.optimizer      = torch.optim.Adam(self.policy_ac.parameters(), lr=lr, betas=betas)
 
@@ -225,12 +228,12 @@ if __name__ == '__main__':
         # save every 500 episodes
         if i_episode % 500 == 0:
             torch.save(ppo.policy_ac.state_dict(), './PPO_{}_episode_{}.pth'.format(env_name, i_episode))
-            
+
         # logging
         if i_episode % log_interval == 0:
             avg_length = int(avg_length/log_interval)
             running_reward = int((running_reward/log_interval))
-            
+
             print('Episode {} \t Avg length: {} \t Avg reward: {}'.format(i_episode, avg_length, running_reward))
             running_reward = 0
             avg_length = 0
