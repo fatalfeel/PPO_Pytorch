@@ -44,6 +44,8 @@ class Actor_Critic(nn.Module):
     def forward(self):
         raise NotImplementedError
 
+    # https://pytorch.org/docs/stable/distributions.html
+    # backpropagation conditions are continue and differential. Sampling probs need in one distribution
     def interact(self, envstate, gamedata):
         torchstate      = torch.FloatTensor(envstate.reshape(1, -1)).double().to(device) #reshape(1,-1) 1d to 2d
         act_mu          = self.network_act(torchstate)
@@ -132,11 +134,12 @@ class CPPO:
         for _ in range(self.train_epochs):
             #cstate_value is V(s) in A3C theroy. critic network is another actor input state
             critic_actlogprobs, next_critic_values, entropy = self.policy_ac.calculation(curr_states, curr_actions)
-            #critic_actlogprobs, entropy = self.policy_ac.calculation(curr_states, curr_actions)
 
-            # Finding the ratio (pi_theta / pi_theta__old):
+            # https://socratic.org/questions/what-is-the-derivative-of-e-lnx
             # log(critic) - log(curraccu) = log(critic/curraccu)
-            # ratios = e^(ln(criticProb)-ln(actorProb)) =  e^ln(criticProb/actorProb) = criticProb/actorProb
+            # ratios  = e^(ln(State2_actProbs)-ln(State1_actProbs)) =  e^ln(State2_actProbs/State1_actProbs)
+            # ratios  = (State2_actProbs/State1_actProbs) = Pw(A1|S2)/Pw(A1|S1), where w is mean weights
+            # ratios' = criticProb/actorProb' in derivative
             ratios  = torch.exp(critic_actlogprobs - curr_logprobs.detach())
 
             #advantages = curr_stdscore - cstate_value.detach()

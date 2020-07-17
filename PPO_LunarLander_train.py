@@ -77,11 +77,12 @@ class Actor_Critic(nn.Module):
     def forward(self):
         raise NotImplementedError
 
-    #policy_curr.interact will call
+    #https://pytorch.org/docs/stable/distributions.html
+    #backpropagation conditions are continue and differential. Sampling probs need in one distribution
     def interact(self, envstate, gamedata):
         torchstate      = torch.from_numpy(envstate).double().to(device)
-        action_probs    = self.network_act(torchstate) #tau(a|s) = P(a,s) 8 elements corresponds to one action
-        distribute      = torch.distributions.Categorical(action_probs) #category distribution
+        actor_actprob   = self.network_act(torchstate) #tau(a|s) = P(a,s) 8 elements corresponds to one action
+        distribute      = torch.distributions.Categorical(actor_actprob) #category distribution
         action          = distribute.sample()
         actlogprob      = distribute.log_prob(action) #logeX
 
@@ -168,11 +169,12 @@ class CPPO:
         for _ in range(self.train_epochs):
             #cstate_value is V(s) in A3C theroy. critic network weights as an actor feed state out reward value
             critic_actlogprobs, next_critic_values, entropy = self.policy_ac.calculation(curr_states, curr_actions)
-            #critic_actlogprobs, entropy = self.policy_ac.calculation(curr_states, curr_actions)
 
-            # Finding the ratio (pi_theta / pi_theta__old):
+            # https://socratic.org/questions/what-is-the-derivative-of-e-lnx
             # log(critic) - log(curraccu) = log(critic/curraccu)
-            # ratios = e^(ln(criticProb)-ln(actorProb)) =  e^ln(criticProb/actorProb) = criticProb/actorProb
+            # ratios  = e^(ln(State2_actProbs)-ln(State1_actProbs)) =  e^ln(State2_actProbs/State1_actProbs)
+            # ratios  = (State2_actProbs/State1_actProbs) = Pw(A1|S2)/Pw(A1|S1), where w is mean weights
+            # ratios' = criticProb/actorProb' in derivative
             ratios  = torch.exp(critic_actlogprobs - curr_logprobs.detach())
 
             #advantages = curr_stdscore - cstate_value.detach()
