@@ -11,7 +11,7 @@ Integrated PPO and Gym source:
 
 Modify some crash problem with weight and float
 
-Advantage function can not backpropagation fixed
+Value function can not backpropagation fixed
 
 Preinstall
 
