@@ -172,7 +172,7 @@ class CPPO:
 
             # Finding the ratio (pi_theta / pi_theta__old):
             # log(critic) - log(curraccu) = log(critic/curraccu)
-            # ratios = e^log(critic/curraccu)
+            # ratios = e^(ln(criticProb)-ln(actorProb)) =  e^ln(criticProb/actorProb) = criticProb/actorProb
             ratios  = torch.exp(critic_actlogprobs - curr_logprobs.detach())
 
             #advantages = curr_stdscore - cstate_value.detach()
