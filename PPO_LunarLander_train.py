@@ -83,7 +83,7 @@ class Actor_Critic(nn.Module):
         action_probs    = self.network_act(torchstate) #tau(a|s) = P(a,s) 8 elements corresponds to one action
         distribute      = torch.distributions.Categorical(action_probs) #category distribution
         action          = distribute.sample()
-        actlogprob      = distribute.log_prob(action)
+        actlogprob      = distribute.log_prob(action) #logeX
 
         gamedata.states.append(torchstate)
         gamedata.actions.append(action)
@@ -95,7 +95,7 @@ class Actor_Critic(nn.Module):
     def calculation(self, states, actions):
         critic_actprobs     = self.network_act(states) #each current with one action probility
         distribute          = torch.distributions.Categorical(critic_actprobs)
-        critic_actlogprobs  = distribute.log_prob(actions)
+        critic_actlogprobs  = distribute.log_prob(actions) #logeX
         entropy             = distribute.entropy() # entropy is uncertain percentage, value higher mean uncertain more
         next_critic_values  = self.network_critic(states) #c_values is V(s) in A3C theroy
 

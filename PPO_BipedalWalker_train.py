@@ -51,7 +51,7 @@ class Actor_Critic(nn.Module):
         #distribute     = torch.distributions.MultivariateNormal(action_mu, cov_mat)
         distribute      = torch.distributions.MultivariateNormal(act_mu, scale_tril=std_mat) #act_mu=center, scale_tril=width
         action          = distribute.sample()
-        actlogprob      = distribute.log_prob(action)
+        actlogprob      = distribute.log_prob(action) #logeX
 
         gamedata.states.append(torchstate)
         gamedata.actions.append(action)
@@ -66,7 +66,7 @@ class Actor_Critic(nn.Module):
         std_mat             = torch.diag_embed(acts_std).double().to(device)
         #distribute         = torch.distributions.MultivariateNormal(action_mu, cov_mat)
         distribute          = torch.distributions.MultivariateNormal(acts_mu, scale_tril=std_mat) #act_mu=center, scale_tril=width
-        critic_actlogprobs  = distribute.log_prob(actions)
+        critic_actlogprobs  = distribute.log_prob(actions) #logeX
         entropy             = distribute.entropy() #entropy is uncertain percentage, value higher mean uncertain more
         next_critic_values  = self.network_critic(states) #c_values is V(s) in A3C theroy
 
