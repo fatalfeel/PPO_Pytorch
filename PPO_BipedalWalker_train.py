@@ -72,19 +72,18 @@ class Actor_Critic(nn.Module):
         entropy             = distribute.entropy() #entropy is uncertain percentage, value higher mean uncertain more
         next_critic_values  = self.network_critic(states) #c_values is V(s) in A3C theroy
 
-        #future using
-        '''states_sampling = None
-        sampler = BatchSampler(SubsetRandomSampler(range(states.size()[0])), states.size()[0], drop_last=False)
-        for indices in sampler:
-            states_sampling = states[indices]
-        next_critic_values = self.network_critic(states_sampling)  # c_values is V(s) in A3C theroy
-        next_critic_actprobs= critic_actprobs.gather(1, actions.unsqueeze(1).type(torch.int64))
-        next_critic_actprobs= torch.squeeze(next_critic_actprobs)'''
+        '''future using'''
+        #states_sampling = None
+        #sampler = BatchSampler(SubsetRandomSampler(range(states.size()[0])), states.size()[0], drop_last=False)
+        #for indices in sampler:
+        #    states_sampling = states[indices]
+        #next_critic_values = self.network_critic(states_sampling)  # c_values is V(s) in A3C theroy
+        #next_critic_actprobs= critic_actprobs.gather(1, actions.unsqueeze(1).type(torch.int64))
+        #next_critic_actprobs= torch.squeeze(next_critic_actprobs)
 
         #if dimension can squeeze then tensor 3d to 2d.
         #EX: squeeze tensor[2,1,3] become to tensor[2,3]
         return critic_actlogprobs, torch.squeeze(next_critic_values), entropy
-        #return critic_actlogprobs, entropy
 
 class CPPO:
     def __init__(self, dim_states, dim_acts, action_std, lr, gamma, train_epochs, eps_clip, betas):
@@ -140,8 +139,8 @@ class CPPO:
             # https://socratic.org/questions/what-is-the-derivative-of-e-lnx
             # log(critic) - log(curraccu) = log(critic/curraccu)
             # ratios  = e^(ln(State2_actProbs)-ln(State1_actProbs)) =  e^ln(State2_actProbs/State1_actProbs)
-            # ratios  = (State2_critic_actProbs/State1_actor_actProbs) = Pw(A1|S2)/Pw(A1|S1), where w is weights(theta)
-            # ratios' = critic_actProb/actor_actProb' in derivative
+            # ratios  = (State2_critic_actProbs/State1_actor_actProbs)
+            # ratios  = next_critic_actprobs/curr_actions_prob = Pw(A1|S2)/Pw(A1|S1), where w is weights(theta)
             ratios  = torch.exp(critic_actlogprobs - curr_logprobs.detach())
 
             #advantages is stdscore mode
