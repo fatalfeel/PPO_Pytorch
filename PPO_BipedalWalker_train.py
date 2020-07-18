@@ -142,7 +142,7 @@ class CPPO:
             # ratios' = criticProb/actorProb' in derivative
             ratios  = torch.exp(critic_actlogprobs - curr_logprobs.detach())
 
-            #advantages = curr_stdscore - cstate_value.detach()
+            #advantages is stdscore mode
             surr1   = ratios * advantages
             surr2   = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
 

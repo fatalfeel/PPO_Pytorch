@@ -7,7 +7,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 if __name__ == '__main__':
     ############## Hyperparameters ##############
-    env_name = "LunarLander-v2"
+    env_name        = "LunarLander-v2"
     # creating environment
     render          = True
     save_gif        = False
