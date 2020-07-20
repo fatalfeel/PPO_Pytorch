@@ -32,14 +32,14 @@ class GameContent:
         self.actions        = []
         self.states         = []
         self.rewards        = []
-        self.actoflogprobs  = []
+        self.actorlogprobs  = []
         self.is_terminals   = []
     
     def ReleaseData(self):
         del self.actions[:]
         del self.states[:]
         del self.rewards[:]
-        del self.actoflogprobs[:]
+        del self.actorlogprobs[:]
         del self.is_terminals[:]
 
 class Actor_Critic(nn.Module):
@@ -88,7 +88,7 @@ class Actor_Critic(nn.Module):
 
         gamedata.states.append(torchstate)
         gamedata.actions.append(action)
-        gamedata.actoflogprobs.append(actlogprob) #the action number corresponds to the action_probs into log
+        gamedata.actorlogprobs.append(actlogprob) #the action number corresponds to the action_probs into log
 
         return action.detach().item() #return action_probs index corresponds to key 1,2,3,4
 
@@ -152,9 +152,9 @@ class CPPO:
 
         # convert list to tensor
         # torch.stack is combine many tensor 1D to 2D
-        curr_states     = torch.stack(gamedata.states).double().to(device).detach()
-        curr_actions    = torch.stack(gamedata.actions).double().to(device).detach()
-        curr_logprobs   = torch.stack(gamedata.actoflogprobs).double().to(device).detach()
+        curr_states         = torch.stack(gamedata.states).double().to(device).detach()
+        curr_actions        = torch.stack(gamedata.actions).double().to(device).detach()
+        curr_actlogprobs    = torch.stack(gamedata.actorlogprobs).double().to(device).detach()
 
         # critic_state_reward   = network_critic(curraccu_states)
         '''refer to a2c-ppo should modify like this
@@ -175,7 +175,7 @@ class CPPO:
             # ratios  = e^(ln(State2_actProbs)-ln(State1_actProbs)) =  e^ln(State2_actProbs/State1_actProbs)
             # ratios  = (State2_critic_actProbs/State1_actor_actProbs)
             # ratios  = next_critic_actprobs/curr_actions_prob = Pw(A1|S2)/Pw(A1|S1), where w is weights(theta)
-            ratios  = torch.exp(critic_actlogprobs - curr_logprobs.detach())
+            ratios  = torch.exp(critic_actlogprobs - curr_actlogprobs.detach())
 
             #advantages is stdscore mode
             surr1   = ratios * advantages
