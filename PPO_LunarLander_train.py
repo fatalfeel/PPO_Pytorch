@@ -130,10 +130,9 @@ class CPPO:
         self.mseLoss        = nn.MSELoss(reduction='mean')
 
     def train_update(self, gamedata):
+        rewards             = []
+        discounted_reward   = 0
         # Monte Carlo estimate of state rewards:
-        rewards = []
-        discounted_reward = 0
-
         for reward, is_terminal in zip(reversed(gamedata.rewards), reversed(gamedata.is_terminals)):
             if is_terminal:
                 discounted_reward = 0
