@@ -193,13 +193,13 @@ if __name__ == '__main__':
     # logging variables
     running_reward  = 0
     avg_length      = 0
-    time_step       = 0
+    timestep       = 0
 
     # training loop
     for i_episode in range(1, max_episodes+1):
         envstate = env.reset()
         for t in range(max_timesteps):
-            time_step +=1
+            timestep +=1
             # Running policy_old:
             #action = ppo.select_action(estates, gamedata)
             action = ppo.policy_ac.interact(envstate, gamedata)
@@ -210,10 +210,10 @@ if __name__ == '__main__':
             gamedata.is_terminals.append(done)
 
             # train_update if its time
-            if time_step % update_timestep == 0:
+            if timestep % update_timestep == 0:
                 ppo.train_update(gamedata)
                 gamedata.clear_memory()
-                time_step = 0
+                timestep = 0
 
             running_reward += reward
             if render:
