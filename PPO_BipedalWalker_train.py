@@ -193,7 +193,7 @@ if __name__ == '__main__':
     # logging variables
     running_reward  = 0
     avg_length      = 0
-    timestep       = 0
+    timestep        = 0
 
     # training loop
     for i_episode in range(1, max_episodes+1):
