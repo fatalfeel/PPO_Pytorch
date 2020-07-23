@@ -9,11 +9,13 @@ Gym main source: https://github.com/openai/gym/tree/master/gym
 
 Integrated PPO and Gym source:
 
-Modify some crash problem with weight and float
+(a)Modify some crash problem with weight and float
 
-Value function can not do backpropagation fixed
+(b)Value function can not do backpropagation fixed
 
-Remove redundant network
+(c)Remove redundant network
+
+(d)Add trick shot method
 
 Preinstall
 
@@ -36,3 +38,6 @@ PPO Lessons
 1.From beginning to full mathematics with python examples
 
 https://fatalfeel.blogspot.com/2013/12/ppo-and-awr-guiding.html
+
+ps:Will transfer PPO to libtorch C++ coming soon
+https://fatalfeel.blogspot.com/2020/06/building-libtorch-and-numpy-in-c.html
