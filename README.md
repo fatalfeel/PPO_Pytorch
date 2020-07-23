@@ -39,6 +39,7 @@ PPO Lessons
 
 https://fatalfeel.blogspot.com/2013/12/ppo-and-awr-guiding.html
 
-ps:Will transfer PPO to libtorch C++ coming soon
+
+PS:Will transfer PPO to libtorch C++ coming soon
 
 https://fatalfeel.blogspot.com/2020/06/building-libtorch-and-numpy-in-c.html
