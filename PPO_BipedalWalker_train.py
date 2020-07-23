@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.distributions
 import gym
-import numpy as np
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -105,6 +104,23 @@ class CPPO:
     #    tstates = torch.FloatTensor(estates.reshape(1, -1)).double().to(device)
     #    return self.policy_curr.interact(tstates, gamedata).cpu().data.numpy().flatten()
 
+    def predict_reward(self, next_state, gamedata):
+        torchstate  = torch.FloatTensor(next_state.reshape(1, -1)).double().to(device)  # reshape(1,-1) 1d to 2d
+        act_mu      = self.policy_ac.network_act(torchstate)
+        std_mat     = torch.diag(self.policy_ac.action_std).double().to(device)  # transfer to matrix
+        distribute  = torch.distributions.MultivariateNormal(act_mu, scale_tril=std_mat)  # act_mu=center, scale_tril=width
+        action      = distribute.sample()
+        actlogprob  = distribute.log_prob(action)  # =lnX
+        next_value  = self.policy_ac.network_critic(torchstate)
+        data_value  = next_value.detach().cpu().data.numpy()[0,0]
+
+        gamedata.states.append(torchstate)
+        gamedata.actions.append(action)  # next action
+        gamedata.actorlogprobs.append(actlogprob)  # the action number corresponds to the action_probs into log
+        gamedata.rewards.append(data_value)
+        gamedata.is_terminals[-1] = True    # make self.gamma * discounted_reward = 0 to keep last reward
+        gamedata.is_terminals.append(True)  # true or false both ok. last item always with self.gamma * discounted_reward = 0
+
     def train_update(self, gamedata):
         # Monte Carlo estimate of rewards:
         rewards = []
@@ -172,20 +188,14 @@ if __name__ == '__main__':
     gamma           = 0.99          # discount factor
     lr              = 0.0001        # parameters for Adam optimizer
     eps_clip        = 0.2           # clip parameter for CPPO
-    betas           = (0.9, 0.999)
-    random_seed     = None
+    betas           = (0.9, 0.999)  # Adam β
+    predict_trick   = True          # trick shot make PPO get better action & reward
     #############################################
 
     # creating environment
     env         = gym.make(env_name)
     dim_states  = env.observation_space.shape[0]
     dim_acts    = env.action_space.shape[0]
-
-    if random_seed:
-        print("Random Seed: {}".format(random_seed))
-        torch.manual_seed(random_seed)
-        env.seed(random_seed)
-        np.random.seed(random_seed)
 
     gamedata    = GameContent()
     ppo         = CPPO(dim_states, dim_acts, action_std, lr, gamma, train_epochs, eps_clip, betas)
@@ -199,20 +209,28 @@ if __name__ == '__main__':
     for i_episode in range(1, max_episodes+1):
         envstate = env.reset()
         for t in range(max_timesteps):
-            timestep +=1
-            # Running policy_old:
-            #action = ppo.select_action(estates, gamedata)
+            timestep += 1
+
+            # Running policy_current: #Done-0 State-0 Act-0
             action = ppo.policy_ac.interact(envstate, gamedata)
+
+            # Done-1 State-1 Act-0 R-0
             envstate, reward, done, _ = env.step(action)
 
             # Saving reward and is_terminals:
             gamedata.rewards.append(reward)
+
+            # is_terminal in next state:
             gamedata.is_terminals.append(done)
 
             # train_update if its time
             if timestep % update_timestep == 0:
+                if predict_trick is True:
+                    ppo.predict_reward(envstate, gamedata)
+
                 ppo.train_update(gamedata)
                 gamedata.clear_memory()
+
                 timestep = 0
 
             running_reward += reward

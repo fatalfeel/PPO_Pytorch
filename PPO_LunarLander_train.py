@@ -129,6 +129,22 @@ class CPPO:
 
         self.mseLoss        = nn.MSELoss(reduction='mean')
 
+    def predict_reward(self, next_state, gamedata):
+        torchstate      = torch.from_numpy(next_state).double().to(device)
+        actor_actprob   = self.policy_ac.network_act(torchstate)  # tau(a|s) = P(a,s) 8 elements corresponds to one action
+        distribute      = torch.distributions.Categorical(actor_actprob)
+        action          = distribute.sample()
+        actlogprob      = distribute.log_prob(action)  # =lnX
+        next_value      = self.policy_ac.network_critic(torchstate)
+        data_value      = next_value.detach().cpu().data.numpy()[0]
+
+        gamedata.states.append(torchstate)
+        gamedata.actions.append(action)  # next action
+        gamedata.actorlogprobs.append(actlogprob)  # the action number corresponds to the action_probs into log
+        gamedata.rewards.append(data_value)
+        gamedata.is_terminals[-1] = True    #make self.gamma * discounted_reward = 0 to keep last reward
+        gamedata.is_terminals.append(True)  #true or false both ok. last item always with self.gamma * discounted_reward = 0
+
     def train_update(self, gamedata):
         rewards             = []
         discounted_reward   = 0
@@ -208,17 +224,13 @@ if __name__ == '__main__':
     gamma           = 0.99          # discount factor
     eps_clip        = 0.2           # clip parameter for PPO2
     betas           = (0.9, 0.999)  # Adam β
-    random_seed     = None
+    predict_trick   = True          # trick shot make PPO get better action & reward
     #############################################
 
     # creating environment
     env         = gym.make(env_name)
     dim_states  = env.observation_space.shape[0]  # LunarLander give 8 states
     dim_acts    = 4  # 4 action directions
-
-    if random_seed:
-        torch.manual_seed(random_seed)
-        env.seed(random_seed)
 
     gamedata    = GameContent()
     ppo         = CPPO(dim_states, dim_acts, h_neurons, lr, gamma, train_epochs, eps_clip, betas)
@@ -230,23 +242,30 @@ if __name__ == '__main__':
 
     # training loop
     for i_episode in range(1, max_episodes+1):
-        envstate = env.reset() #init state value to matrix
+        envstate = env.reset() #Done-0 State-0
         for t in range(max_timesteps):
             timestep += 1
 
-            # Running policy_current:
+            # Running policy_current: #Done-0 State-0 Act-0
             action = ppo.policy_ac.interact(envstate, gamedata)
+
+            # Done-1 State-1 Act-0 R-0
             envstate, reward, done, _ = env.step(action)
 
             # one reward R(τ) = τ(a|s)R(a,s) in a certain state select an action and return the reward
             gamedata.rewards.append(reward)
-            # Saving reward and is_terminal:
+
+            # is_terminal in next state:
             gamedata.is_terminals.append(done)
 
             # train_update if its time
             if timestep % update_timestep == 0:
+                if predict_trick is True:
+                    ppo.predict_reward(envstate, gamedata)
+
                 ppo.train_update(gamedata)
                 gamedata.ReleaseData()
+
                 timestep = 0
 
             running_reward += reward
