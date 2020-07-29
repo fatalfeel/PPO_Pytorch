@@ -33,6 +33,10 @@ https://pytorch.org
 
 pip3 install box2d
 
+4.C++ version
+
+https://github.com/fatalfeel/PPO_libtorch
+
 !!!PPO Lessons!!!
 
 From beginning to full mathematics with python examples
