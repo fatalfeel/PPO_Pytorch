@@ -113,6 +113,22 @@ class Actor_Critic(nn.Module):
         #EX: squeeze tensor[2,1,3] become to tensor[2,3]
         return critic_actlogprobs, torch.squeeze(next_critic_values), entropy
 
+    def predict_reward(self, next_state, gamedata):
+        torchstate      = torch.from_numpy(next_state).double().to(device)
+        actor_actprob   = self.network_act(torchstate)  # tau(a|s) = P(a,s) 8 elements corresponds to one action
+        distribute      = torch.distributions.Categorical(actor_actprob)
+        action          = distribute.sample()
+        actlogprob      = distribute.log_prob(action)  # =lnX
+        next_value      = self.network_critic(torchstate)
+        data_value      = next_value.detach().cpu().data.numpy()[0]
+
+        gamedata.states.append(torchstate)
+        gamedata.actions.append(action)  # next action
+        gamedata.actorlogprobs.append(actlogprob)  # the action number corresponds to the action_probs into log
+        gamedata.rewards.append(data_value)
+        gamedata.is_terminals[-1] = True    #make self.gamma * discounted_reward = 0 to keep last reward
+        gamedata.is_terminals.append(True)  #true or false both ok. last item always with self.gamma * discounted_reward = 0
+
 class CPPO:
     def __init__(self, dim_states, dim_acts, h_neurons, lr, gamma, train_epochs, eps_clip, betas):
         self.lr             = lr
@@ -128,22 +144,6 @@ class CPPO:
         #self.policy_curr.load_state_dict(self.policy_ac.state_dict())
 
         self.mseLoss        = nn.MSELoss(reduction='mean')
-
-    def predict_reward(self, next_state, gamedata):
-        torchstate      = torch.from_numpy(next_state).double().to(device)
-        actor_actprob   = self.policy_ac.network_act(torchstate)  # tau(a|s) = P(a,s) 8 elements corresponds to one action
-        distribute      = torch.distributions.Categorical(actor_actprob)
-        action          = distribute.sample()
-        actlogprob      = distribute.log_prob(action)  # =lnX
-        next_value      = self.policy_ac.network_critic(torchstate)
-        data_value      = next_value.detach().cpu().data.numpy()[0]
-
-        gamedata.states.append(torchstate)
-        gamedata.actions.append(action)  # next action
-        gamedata.actorlogprobs.append(actlogprob)  # the action number corresponds to the action_probs into log
-        gamedata.rewards.append(data_value)
-        gamedata.is_terminals[-1] = True    #make self.gamma * discounted_reward = 0 to keep last reward
-        gamedata.is_terminals.append(True)  #true or false both ok. last item always with self.gamma * discounted_reward = 0
 
     def train_update(self, gamedata):
         rewards             = []
@@ -261,7 +261,7 @@ if __name__ == '__main__':
             # train_update if its time
             if timestep % update_timestep == 0:
                 if predict_trick is True:
-                    ppo.predict_reward(envstate, gamedata)
+                    ppo.policy_ac.predict_reward(envstate, gamedata)
 
                 ppo.train_update(gamedata)
                 gamedata.ReleaseData()

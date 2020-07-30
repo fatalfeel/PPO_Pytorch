@@ -84,6 +84,23 @@ class Actor_Critic(nn.Module):
         #EX: squeeze tensor[2,1,3] become to tensor[2,3]
         return critic_actlogprobs, torch.squeeze(next_critic_values), entropy
 
+    def predict_reward(self, next_state, gamedata):
+        torchstate  = torch.FloatTensor(next_state.reshape(1, -1)).double().to(device)  # reshape(1,-1) 1d to 2d
+        act_mu      = self.network_act(torchstate)
+        std_mat     = torch.diag(self.action_std).double().to(device)  # transfer to matrix
+        distribute  = torch.distributions.MultivariateNormal(act_mu, scale_tril=std_mat)  # act_mu=center, scale_tril=width
+        action      = distribute.sample()
+        actlogprob  = distribute.log_prob(action)  # =lnX
+        next_value  = self.network_critic(torchstate)
+        data_value  = next_value.detach().cpu().data.numpy()[0,0]
+
+        gamedata.states.append(torchstate)
+        gamedata.actions.append(action)  # next action
+        gamedata.actorlogprobs.append(actlogprob)  # the action number corresponds to the action_probs into log
+        gamedata.rewards.append(data_value)
+        gamedata.is_terminals[-1] = True    # make self.gamma * discounted_reward = 0 to keep last reward
+        gamedata.is_terminals.append(True)  # true or false both ok. last item always with self.gamma * discounted_reward = 0
+
 class CPPO:
     def __init__(self, dim_states, dim_acts, action_std, lr, gamma, train_epochs, eps_clip, betas):
         self.lr             = lr
@@ -104,27 +121,10 @@ class CPPO:
     #    tstates = torch.FloatTensor(estates.reshape(1, -1)).double().to(device)
     #    return self.policy_curr.interact(tstates, gamedata).cpu().data.numpy().flatten()
 
-    def predict_reward(self, next_state, gamedata):
-        torchstate  = torch.FloatTensor(next_state.reshape(1, -1)).double().to(device)  # reshape(1,-1) 1d to 2d
-        act_mu      = self.policy_ac.network_act(torchstate)
-        std_mat     = torch.diag(self.policy_ac.action_std).double().to(device)  # transfer to matrix
-        distribute  = torch.distributions.MultivariateNormal(act_mu, scale_tril=std_mat)  # act_mu=center, scale_tril=width
-        action      = distribute.sample()
-        actlogprob  = distribute.log_prob(action)  # =lnX
-        next_value  = self.policy_ac.network_critic(torchstate)
-        data_value  = next_value.detach().cpu().data.numpy()[0,0]
-
-        gamedata.states.append(torchstate)
-        gamedata.actions.append(action)  # next action
-        gamedata.actorlogprobs.append(actlogprob)  # the action number corresponds to the action_probs into log
-        gamedata.rewards.append(data_value)
-        gamedata.is_terminals[-1] = True    # make self.gamma * discounted_reward = 0 to keep last reward
-        gamedata.is_terminals.append(True)  # true or false both ok. last item always with self.gamma * discounted_reward = 0
-
     def train_update(self, gamedata):
+        rewards             = []
+        discounted_reward   = 0
         # Monte Carlo estimate of rewards:
-        rewards = []
-        discounted_reward = 0
         for reward, is_terminal in zip(reversed(gamedata.rewards), reversed(gamedata.is_terminals)):
             if is_terminal:
                 discounted_reward = 0
@@ -226,7 +226,7 @@ if __name__ == '__main__':
             # train_update if its time
             if timestep % update_timestep == 0:
                 if predict_trick is True:
-                    ppo.predict_reward(envstate, gamedata)
+                    ppo.policy_ac.predict_reward(envstate, gamedata)
 
                 ppo.train_update(gamedata)
                 gamedata.clear_memory()
