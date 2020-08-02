@@ -197,8 +197,8 @@ class CPPO:
             surr1   = ratios * advantages
             surr2   = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
 
-            # mseLoss is Mean Square Error = (target - output)^2
-            loss    = -torch.min(surr1, surr2) + 0.5*self.mseLoss(rewards, next_critic_values) - 0.01*entropy
+            # mseLoss is Mean Square Error = (target - output)^2, next_critic_values in first param follow libtorch rules
+            loss    = -torch.min(surr1, surr2) + 0.5*self.mseLoss(next_critic_values, rewards) - 0.01*entropy
 
             # take gradient step
             self.optimizer.zero_grad()

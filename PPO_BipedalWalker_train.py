@@ -64,9 +64,9 @@ class Actor_Critic(nn.Module):
     def calculation(self, states, actions):
         acts_mu             = self.network_act(states)
         acts_std            = self.action_std.expand_as(acts_mu)
-        std_mat             = torch.diag_embed(acts_std).double().to(device)
+        mats_std            = torch.diag_embed(acts_std).double().to(device)
         #distribute         = torch.distributions.MultivariateNormal(action_mu, cov_mat)
-        distribute          = torch.distributions.MultivariateNormal(acts_mu, scale_tril=std_mat) #act_mu=center, scale_tril=width
+        distribute          = torch.distributions.MultivariateNormal(acts_mu, scale_tril=mats_std) #act_mu=center, scale_tril=width
         critic_actlogprobs  = distribute.log_prob(actions) #logeX
         entropy             = distribute.entropy() #entropy is uncertain percentage, value higher mean uncertain more
         next_critic_values  = self.network_critic(states) #c_values is V(s) in A3C theroy
@@ -163,8 +163,8 @@ class CPPO:
             surr1   = ratios * advantages
             surr2   = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
 
-            # mseLoss is Mean Square Error = (target - output)^2
-            loss    = -torch.min(surr1, surr2) + 0.5*self.MseLoss(rewards, next_critic_values) - 0.01*entropy
+            # mseLoss is Mean Square Error = (target - output)^2, next_critic_values in first param follow libtorch rules
+            loss    = -torch.min(surr1, surr2) + 0.5*self.MseLoss(next_critic_values, rewards) - 0.01*entropy
 
             # take gradient step
             self.optimizer.zero_grad()
