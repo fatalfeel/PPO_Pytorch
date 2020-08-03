@@ -126,8 +126,8 @@ class Actor_Critic(nn.Module):
         gamedata.actions.append(action)  # next action
         gamedata.actorlogprobs.append(actlogprob)  # the action number corresponds to the action_probs into log
         gamedata.rewards.append(data_value)
-        gamedata.is_terminals[-1] = True    #make self.gamma * discounted_reward = 0 to keep last reward
-        gamedata.is_terminals.append(True)  #true or false both ok. last item always with self.gamma * discounted_reward = 0
+        #gamedata.is_terminals[-1] = True   # make self.gamma * discounted_reward = 0 to keep last reward
+        gamedata.is_terminals.append(True)  # true or false both ok. last item always with self.gamma * discounted_reward = 0
 
 class CPPO:
     def __init__(self, dim_states, dim_acts, h_neurons, lr, gamma, train_epochs, eps_clip, betas):
