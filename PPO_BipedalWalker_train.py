@@ -113,7 +113,7 @@ class CPPO:
         self.MseLoss = nn.MSELoss(reduction='mean')
 
     #def select_action(self, estates, gamedata):
-    #    tstates = torch.FloatTensor(estates.reshape(1, -1)).double().to(device)
+    #    tstates = torch.DoubleTensor(estates.reshape(1, -1)).double().to(device)
     #    return self.policy_curr.interact(tstates, gamedata).cpu().data.numpy().flatten()
 
     def train_update(self, gamedata):
