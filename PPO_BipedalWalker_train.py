@@ -61,6 +61,10 @@ class Actor_Critic(nn.Module):
         #flatten do 2d to 1d
         return action.detach().cpu().data.numpy().flatten()
 
+    # policy_ac.calculation will call
+    # sampler = BatchSampler(SubsetRandomSampler(range(batch_size)), mini_batch_size, drop_last=False)
+    # usually mini_batch_size sample < states'size do forward
+    # in our example the mini_batch_size = states'size
     def calculation(self, states, actions):
         acts_mu             = self.network_act(states)
         acts_std            = self.action_std.expand_as(acts_mu)
@@ -70,15 +74,6 @@ class Actor_Critic(nn.Module):
         critic_actlogprobs  = distribute.log_prob(actions) #logeX
         entropy             = distribute.entropy() #entropy is uncertain percentage, value higher mean uncertain more
         next_critic_values  = self.network_critic(states) #c_values is V(s) in A3C theroy
-
-        '''future using'''
-        #states_sampling = None
-        #sampler = BatchSampler(SubsetRandomSampler(range(states.size()[0])), states.size()[0], drop_last=False)
-        #for indices in sampler:
-        #    states_sampling = states[indices]
-        #next_critic_values = self.network_critic(states_sampling)  # c_values is V(s) in A3C theroy
-        #next_critic_actprobs= critic_actprobs.gather(1, actions.unsqueeze(1).type(torch.int64))
-        #next_critic_actprobs= torch.squeeze(next_critic_actprobs)
 
         #if dimension can squeeze then tensor 3d to 2d.
         #EX: squeeze tensor[2,1,3] become to tensor[2,3]
