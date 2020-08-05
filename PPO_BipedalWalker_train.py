@@ -46,7 +46,7 @@ class Actor_Critic(nn.Module):
     # https://pytorch.org/docs/stable/distributions.html
     # backpropagation conditions are continue and differential. Sampling probs need in one distribution
     def interact(self, envstate, gamedata):
-        torchstate      = torch.FloatTensor(envstate.reshape(1, -1)).double().to(device) #reshape(1,-1) 1d to 2d
+        torchstate      = torch.DoubleTensor(envstate.reshape(1, -1)).to(device) #reshape(1,-1) 1d to 2d
         act_mu          = self.network_act(torchstate)
         std_mat         = torch.diag(self.action_std).double().to(device) #transfer to matrix
         #distribute     = torch.distributions.MultivariateNormal(action_mu, cov_mat)
@@ -80,7 +80,7 @@ class Actor_Critic(nn.Module):
         return critic_actlogprobs, torch.squeeze(next_critic_values), entropy
 
     def predict_reward(self, next_state, gamedata):
-        torchstate  = torch.FloatTensor(next_state.reshape(1, -1)).double().to(device)  # reshape(1,-1) 1d to 2d
+        torchstate  = torch.DoubleTensor(next_state.reshape(1, -1)).to(device)  # reshape(1,-1) 1d to 2d
         act_mu      = self.network_act(torchstate)
         std_mat     = torch.diag(self.action_std).double().to(device)  # transfer to matrix
         distribute  = torch.distributions.MultivariateNormal(act_mu, scale_tril=std_mat)  # act_mu=center, scale_tril=width
