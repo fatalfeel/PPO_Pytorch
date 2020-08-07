@@ -107,8 +107,8 @@ class Actor_Critic(nn.Module):
         #EX: squeeze tensor[2,1,3] become to tensor[2,3]
         return critic_actlogprobs, torch.squeeze(next_critic_values), entropy
 
-    def predict_reward(self, next_state, gamedata):
-        torchstate      = torch.from_numpy(next_state).double().to(device)
+    def predict_reward(self, next_state, gamedata, gamma):
+        '''torchstate      = torch.from_numpy(next_state).double().to(device)
         actor_actprob   = self.network_act(torchstate)  # tau(a|s) = P(a,s) 8 elements corresponds to one action
         distribute      = torch.distributions.Categorical(actor_actprob)
         action          = distribute.sample()
@@ -121,7 +121,13 @@ class Actor_Critic(nn.Module):
         gamedata.actorlogprobs.append(actlogprob)  # the action number corresponds to the action_probs into log
         gamedata.rewards.append(data_value)
         #gamedata.is_terminals[-1] = True   # make self.gamma * discounted_reward = 0 to keep last reward
-        gamedata.is_terminals.append(True)  # true or false both ok. last item always with self.gamma * discounted_reward = 0
+        gamedata.is_terminals.append(True)'''
+
+        if gamedata.is_terminals[-1] is False:
+            torchstate = torch.from_numpy(next_state).double().to(device)
+            next_value = self.network_critic(torchstate)
+            data_value = next_value.detach().cpu().data.numpy()[0]
+            gamedata.rewards[-1] = gamedata.rewards[-1] + gamma * data_value
 
 class CPPO:
     def __init__(self, dim_states, dim_acts, h_neurons, lr, gamma, train_epochs, eps_clip, betas):
@@ -140,7 +146,7 @@ class CPPO:
         self.mseLoss        = nn.MSELoss(reduction='mean')
 
     def train_update(self, gamedata):
-        rewards             = []
+        returns             = []
         discounted_reward   = 0
         # Monte Carlo estimate of state rewards:
         for reward, is_terminal in zip(reversed(gamedata.rewards), reversed(gamedata.is_terminals)):
@@ -148,17 +154,17 @@ class CPPO:
                 discounted_reward = 0
             # R(τ) = gamma^n * τ(a|s)R(a,s) , n=1~k
             discounted_reward = reward + (self.gamma * discounted_reward)
-            rewards.insert(0, discounted_reward)
+            returns.insert(0, discounted_reward)
 
-        rewards = torch.tensor(rewards).double().to(device)
+        returns = torch.tensor(returns).double().to(device)
 
-        '''rewards.mean() is E[R(τ)]
-        rewards.std on torch is {1/(n-1) * Σ(x - x_average)} ** 0.5  (x ** 0.5 = x^0.5)
-        1e-5 = 0.00001 which avoid rewards.std() is zero
-        (Rewards - average_R) / (standard_R + 0.00001) is standard score
-        rewards = (rewards - rewards.mean()) / (rewards.std() + 1e-5)'''
+        '''returns.mean() is E[R(τ)]
+        returns.std on torch is {1/(n-1) * Σ(x - x_average)} ** 0.5  (x ** 0.5 = x^0.5)
+        1e-5 = 0.00001 which avoid returns.std() is zero
+        (returns - average_R) / (standard_R + 0.00001) is standard score
+        returns = (returns - returns.mean()) / (returns.std() + 1e-5)'''
         # should modify
-        #curraccu_stdscore   = (rewards - rewards.mean()) / (rewards.std() + 1e-5) #Q(s,a)
+        #curraccu_stdscore   = (returns - returns.mean()) / (returns.std() + 1e-5) #Q(s,a)
 
         # convert list to tensor
         # torch.stack is combine many tensor 1D to 2D
@@ -172,7 +178,7 @@ class CPPO:
            advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
         critic_vpi  = self.policy_ac.network_critic(curr_states)
         critic_vpi  = torch.squeeze(critic_vpi)
-        qsa_sub_vs  = rewards - critic_vpi.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
+        qsa_sub_vs  = returns - critic_vpi.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
         advantages  = (qsa_sub_vs - qsa_sub_vs.mean()) / (qsa_sub_vs.std() + 1e-5)
 
         # Optimize policy for K epochs:
@@ -192,7 +198,7 @@ class CPPO:
             surr2   = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
 
             # mseLoss is Mean Square Error = (target - output)^2, next_critic_values in first param follow libtorch rules
-            loss    = -torch.min(surr1, surr2) + 0.5*self.mseLoss(next_critic_values, rewards) - 0.01*entropy
+            loss    = -torch.min(surr1, surr2) + 0.5*self.mseLoss(next_critic_values, returns) - 0.01*entropy
 
             # take gradient step
             self.optimizer.zero_grad()
@@ -255,7 +261,7 @@ if __name__ == '__main__':
             # train_update if its time
             if timestep % update_timestep == 0:
                 if predict_trick is True:
-                    ppo.policy_ac.predict_reward(envstate, gamedata)
+                    ppo.policy_ac.predict_reward(envstate, gamedata, gamma)
 
                 ppo.train_update(gamedata)
                 gamedata.ReleaseData()
