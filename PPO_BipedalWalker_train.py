@@ -79,6 +79,7 @@ class Actor_Critic(nn.Module):
         #EX: squeeze tensor[2,1,3] become to tensor[2,3]
         return critic_actlogprobs, torch.squeeze(next_critic_values), entropy
 
+    # if is_terminals is false use Markov formula to replace last reward
     def predict_reward(self, next_state, gamedata, gamma):
         '''torchstate = torch.DoubleTensor(next_state.reshape(1, -1)).to(device)  # reshape(1,-1) 1d to 2d
         act_mu = self.network_act(torchstate)
