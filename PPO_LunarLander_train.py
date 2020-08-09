@@ -144,7 +144,7 @@ class CPPO:
         #self.policy_curr   = Actor_Critic(dim_states, dim_acts, h_neurons).double().to(device)
         #self.policy_curr.load_state_dict(self.policy_ac.state_dict())
 
-        self.mseLoss        = nn.MSELoss(reduction='none')
+        self.MseLoss        = nn.MSELoss(reduction='none')
 
     def train_update(self, gamedata):
         returns             = []
@@ -198,8 +198,8 @@ class CPPO:
             surr1   = ratios * advantages
             surr2   = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
 
-            # mseLoss is Mean Square Error = (target - output)^2, next_critic_values in first param follow libtorch rules
-            loss    = -torch.min(surr1, surr2) + 0.5*self.mseLoss(next_critic_values, returns) - 0.01*entropy
+            # MseLoss is Mean Square Error = (target - output)^2, next_critic_values in first param follow libtorch rules
+            loss    = -torch.min(surr1, surr2) + 0.5*self.MseLoss(next_critic_values, returns) - 0.01*entropy
 
             # take gradient step
             self.optimizer.zero_grad()
