@@ -131,7 +131,7 @@ class Actor_Critic(nn.Module):
             gamedata.rewards[-1] = gamedata.rewards[-1] + gamma * data_value
 
 class CPPO:
-    def __init__(self, dim_states, dim_acts, h_neurons, lr, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef, betas):
+    def __init__(self, dim_states, dim_acts, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef):
         self.lr             = lr
         self.betas          = betas
         self.gamma          = gamma
@@ -233,11 +233,11 @@ if __name__ == '__main__':
     update_timestep = 2000          # train_update policy every n timesteps
     train_epochs    = 4             # train_update policy for epochs
     lr              = 0.0005        # learning rate
+    betas           = (0.9, 0.999)  # Adam β
     gamma           = 0.99          # discount factor
     eps_clip        = 0.2           # clip parameter for PPO2
     vloss_coef      = 0.5           # clip parameter for PPO2
     entropy_coef    = 0.01
-    betas           = (0.9, 0.999)  # Adam β
     predict_trick   = True          # trick shot make PPO get better action & reward
     #############################################
 
@@ -247,7 +247,7 @@ if __name__ == '__main__':
     dim_acts    = 4  # 4 action directions
 
     gamedata    = GameContent()
-    ppo         = CPPO(dim_states, dim_acts, h_neurons, lr, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef, betas)
+    ppo         = CPPO(dim_states, dim_acts, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef)
 
     # logging variables
     running_reward  = 0

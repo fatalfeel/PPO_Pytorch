@@ -104,7 +104,7 @@ class Actor_Critic(nn.Module):
             gamedata.rewards[-1] = gamedata.rewards[-1] + gamma * data_value
 
 class CPPO:
-    def __init__(self, dim_states, dim_acts, action_std, lr, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef, betas):
+    def __init__(self, dim_states, dim_acts, action_std, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef):
         self.lr             = lr
         self.betas          = betas
         self.gamma          = gamma
@@ -198,12 +198,12 @@ if __name__ == '__main__':
     update_timestep = 4000          # train_update policy every n timesteps
     train_epochs    = 40            # train_update policy for K epochs
     action_std      = 0.5           # constant std for action distribution (Multivariate Normal)
-    gamma           = 0.99          # discount factor
     lr              = 0.0001        # parameters for Adam optimizer
+    betas           = (0.9, 0.999)  # Adam β
+    gamma           = 0.99  # discount factor
     eps_clip        = 0.2           # clip parameter for CPPO
     vloss_coef      = 0.5           # clip parameter for CPPO
     entropy_coef    = 0.01
-    betas           = (0.9, 0.999)  # Adam β
     predict_trick   = True          # trick shot make PPO get better action & reward
     #############################################
 
@@ -213,7 +213,7 @@ if __name__ == '__main__':
     dim_acts    = env.action_space.shape[0]
 
     gamedata    = GameContent()
-    ppo         = CPPO(dim_states, dim_acts, action_std, lr, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef, betas)
+    ppo         = CPPO(dim_states, dim_acts, action_std, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef)
 
     # logging variables
     running_reward  = 0
