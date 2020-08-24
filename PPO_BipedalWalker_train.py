@@ -172,10 +172,14 @@ class CPPO:
                 value_losses_clipped = (value_pred_clipped - return_batch).pow(2)
                 value_losses = (values - return_batch).pow(2)
                 value_loss = 0.5 * torch.max(value_losses,value_losses_clipped).mean() '''
+            # value_predict_clip is critical predict value + (critical predict value - originla critical value)|range between(-param~+param)
+            # value_predict_loss is (value_predict_clip - MDP-reward)^2
+            # value_critic_loss is (critical predict value - MDP-reward)^2
+            # value_loss is 0.5 x select max items in (predict_loss or value_critic_loss) ex: A=[2,6] b=[4,5] torch max=>[4,6]
             value_predict_clip  = critic_vpi.detach() + (next_critic_values - critic_vpi.detach()).clamp(-self.eps_clip, self.eps_clip)
             value_predict_loss  = self.MseLoss(value_predict_clip, returns)
             value_critic_loss   = self.MseLoss(next_critic_values, returns)
-            value_loss          = 0.5 * torch.max(value_predict_loss, value_critic_loss) #combine 2 biggest loss, not pick one of them
+            value_loss          = 0.5 * torch.max(value_predict_loss, value_critic_loss)
 
             # mseLoss is Mean Square Error = (target - output)^2, next_critic_values in first param follow libtorch rules
             # loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(next_critic_values, returns) - 0.01*entropy
