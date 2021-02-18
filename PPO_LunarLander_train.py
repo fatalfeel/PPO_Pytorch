@@ -254,6 +254,7 @@ if __name__ == '__main__':
 
     gamedata    = GameContent()
     ppo         = CPPO(dim_states, dim_acts, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef)
+    ppo.policy_ac.train()
 
     # logging variables
     running_reward  = 0

@@ -28,9 +28,11 @@ if __name__ == '__main__':
     
     gamedata    = GameContent()
     ppo         = CPPO(dim_states, dim_acts, action_std, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef)
+    ppo.policy_ac.eval()
 
     directory = "./preTrained/"
     filename = "PPO_{}.pth".format(env_name)
+
     # map_location=torch.device('cpu') for cpu only if you have cuda then cancel it
     ppo.policy_ac.load_state_dict(torch.load(directory+filename, map_location=torch.device('cpu')))
 
