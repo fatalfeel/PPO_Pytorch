@@ -146,7 +146,7 @@ class CPPO:
         #self.policy_curr   = Actor_Critic(dim_states, dim_acts, h_neurons).double().to(device)
         #self.policy_curr.load_state_dict(self.policy_ac.state_dict())
 
-        self.MseLoss        = nn.MSELoss(reduction='none')
+        self.MseLoss        = nn.MSELoss(reduction='none').to(device)
 
     def train_update(self, gamedata):
         returns             = []
