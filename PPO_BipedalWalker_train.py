@@ -119,7 +119,7 @@ class CPPO:
         #self.policy_curr = Actor_Critic(dim_states, dim_acts, action_std).double().to(device)
         #self.policy_curr.load_state_dict(self.policy_ac.state_dict())
 
-        self.MseLoss        = nn.MSELoss(reduction='none').to(device)
+        self.MseLoss        = nn.MSELoss(reduction='none').double().to(device)
 
     #def select_action(self, estates, gamedata):
     #    tstates = torch.DoubleTensor(estates.reshape(1, -1)).double().to(device)
