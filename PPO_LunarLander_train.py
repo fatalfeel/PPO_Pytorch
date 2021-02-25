@@ -127,7 +127,7 @@ class Actor_Critic(nn.Module):
         if gamedata.is_terminals[-1] is False:
             torchstate = torch.from_numpy(next_state).double().to(device)
             next_value = self.network_critic(torchstate)
-            data_value = next_value.detach().cpu().data.numpy()[0]
+            data_value = next_value.detach().cpu().numpy()[0]
             gamedata.rewards[-1] = gamedata.rewards[-1] + gamma * data_value
 
 class CPPO:

@@ -100,7 +100,7 @@ class Actor_Critic(nn.Module):
         if gamedata.is_terminals[-1] is False:
             torchstate = torch.DoubleTensor(next_state.reshape(1, -1)).to(device)  # reshape(1,-1) 1d to 2d
             next_value = self.network_critic(torchstate)
-            data_value = next_value.detach().cpu().data.numpy()[0,0]
+            data_value = next_value.detach().cpu().numpy()[0,0]
             gamedata.rewards[-1] = gamedata.rewards[-1] + gamma * data_value
 
 class CPPO:
