@@ -159,34 +159,34 @@ class CPPO:
 
         # convert list to tensor
         # torch.stack is combine many tensor 1D to 2D
-        curr_states         = torch.stack(gamedata.states).double().to(device).detach()
-        curr_actions        = torch.stack(gamedata.actions).double().to(device).detach()
-        curr_actlogprobs    = torch.stack(gamedata.actorlogprobs).double().to(device).detach()
+        step_states         = torch.stack(gamedata.states).double().to(device).detach()
+        step_actions        = torch.stack(gamedata.actions).double().to(device).detach()
+        step_actlogprobs    = torch.stack(gamedata.actorlogprobs).double().to(device).detach()
 
         # critic_state_reward   = network_critic(curraccu_states)
         '''refer to a2c-ppo should modify like this
            advantages   = rollouts.returns[:-1] - rollouts.value_preds[:-1]
            advantages   = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
-        curr_preds      = self.policy_ac.network_critic(curr_states) #faster than do every times in interact
-        curr_preds      = torch.squeeze(curr_preds)
-        rc_diff         = returns - curr_preds.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
-        advantages      = (rc_diff - rc_diff.mean()) / (rc_diff.std() + 1e-5)
+        step_values     = self.policy_ac.network_critic(step_states) #faster than do every times in interact
+        step_values     = torch.squeeze(step_values)
+        rv_diff         = returns - step_values.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
+        advantages      = (rv_diff - rv_diff.mean()) / (rv_diff.std() + 1e-5)
 
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
-            #cstate_value is V(s) in A3C theroy. critic network weights as an actor feed state out reward value
-            epoch_actlogprobs, critic_values, entropy = self.policy_ac.calculation(curr_states, curr_actions)
+            #cstate_value is V(s) in A3C theroy. critic network weights as an actor feed state out
+            epoch_actlogprobs, critic_values, entropy = self.policy_ac.calculation(step_states, step_actions)
 
             # https://socratic.org/questions/what-is-the-derivative-of-e-lnx
             # log(critic) - log(curraccu) = log(critic/curraccu)
             # ratios  = e^(ln(State2_actProbs)-ln(State1_actProbs)) =  e^ln(State2_actProbs/State1_actProbs)
             # ratios  = (State2_critic_actProbs/State1_actor_actProbs)
             # ratios  = next_critic_actprobs/curr_actions_prob = Pw(A1|S2)/Pw(A1|S1), where w is weights(theta)
-            ratios  = torch.exp(epoch_actlogprobs - curr_actlogprobs.detach())
+            ratios  = torch.exp(epoch_actlogprobs - step_actlogprobs.detach())
 
             #advantages is stdscore mode
-            surr1       = ratios * advantages
-            surr2       = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
+            surr1   = ratios * advantages
+            surr2   = torch.clamp(ratios, 1-self.eps_clip, 1+self.eps_clip) * advantages
 
             #we get all samples of critic_values, so value_preds_batch equal critic_values
             ''' value_pred_clipped = value_preds_batch + (values - value_preds_batch).clamp(-self.clip_param, self.clip_param)
@@ -197,13 +197,13 @@ class CPPO:
             # value_predict_loss is (value_predict_clip - MDP-reward)^2
             # value_critic_loss is (critical predict value - MDP-reward)^2
             # value_loss is 0.5 x select max items in (predict_loss or value_critic_loss) ex: A=[2,6] b=[4,5] torch max=>[4,6]
-            value_predict_clip  = curr_preds.detach() + (critic_values - curr_preds.detach()).clamp(-self.eps_clip, self.eps_clip)
+            value_predict_clip  = step_values.detach() + (critic_values - step_values.detach()).clamp(-self.eps_clip, self.eps_clip)
             value_predict_loss  = self.MseLoss(value_predict_clip, returns)
             value_critic_loss   = self.MseLoss(critic_values, returns)
             value_loss          = 0.5 * torch.max(value_predict_loss, value_critic_loss)
 
             # MseLoss is Mean Square Error = (target - output)^2, critic_values in first param follow libtorch rules
-            #loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(critic_values, returns) - 0.01*entropy
+            # loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(critic_values, returns) - 0.01*entropy
             loss = -torch.min(surr1, surr2) + self.vloss_coef * value_loss - self.entropy_coef * entropy
 
             # take gradient step
