@@ -78,13 +78,13 @@ class Actor_Critic(nn.Module):
         raise NotImplementedError
 
     #https://pytorch.org/docs/stable/distributions.html
-    #Categorical distribution follow actor_actprob which sum is 1.0 then sample out your action also do entropy
+    #Categorical distribution follow actor_prob which sum is 1.0 then sample out your action also do entropy
     def interact(self, envstate, gamedata):
-        torchstate      = torch.from_numpy(envstate).double().to(device)
-        actor_actprob   = self.network_act(torchstate) #tau(a|s) = P(a,s) 8 elements corresponds to one action
-        distribute      = torch.distributions.Categorical(actor_actprob)
-        action          = distribute.sample()
-        actlogprob      = distribute.log_prob(action) #logeX
+        torchstate  = torch.from_numpy(envstate).double().to(device)
+        actor_prob  = self.network_act(torchstate) #tau(a|s) = P(a,s) 8 elements corresponds to one action
+        distribute  = torch.distributions.Categorical(actor_prob)
+        action      = distribute.sample()
+        actlogprob  = distribute.log_prob(action) #logeX
 
         gamedata.states.append(torchstate)
         gamedata.actions.append(action)
@@ -97,15 +97,15 @@ class Actor_Critic(nn.Module):
     #usually mini_batch_size sample < states'size do forward
     #in our example the mini_batch_size = states'size
     def calculation(self, states, actions):
-        critic_actprobs     = self.network_act(states) #each current with one action probility
-        distribute          = torch.distributions.Categorical(critic_actprobs)
-        critic_actlogprobs  = distribute.log_prob(actions) #logeX
+        actor_probs         = self.network_act(states) #each current with one action probility
+        distribute          = torch.distributions.Categorical(actor_probs)
+        epoch_actlogprobs   = distribute.log_prob(actions) #logeX
         entropy             = distribute.entropy() # entropy is uncertain percentage, value higher mean uncertain more
         critic_values       = self.network_critic(states) #c_values is V(s) in A3C theroy
 
         #if dimension can squeeze then tensor 3d to 2d.
         #EX: squeeze tensor[2,1,3] become to tensor[2,3]
-        return critic_actlogprobs, torch.squeeze(critic_values), entropy
+        return epoch_actlogprobs, torch.squeeze(critic_values), entropy
 
     # if is_terminals is false use Markov formula to replace last reward
     def predict_reward(self, next_state, gamedata, gamma):
@@ -175,14 +175,14 @@ class CPPO:
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             #cstate_value is V(s) in A3C theroy. critic network weights as an actor feed state out reward value
-            critic_actlogprobs, critic_values, entropy = self.policy_ac.calculation(curr_states, curr_actions)
+            epoch_actlogprobs, critic_values, entropy = self.policy_ac.calculation(curr_states, curr_actions)
 
             # https://socratic.org/questions/what-is-the-derivative-of-e-lnx
             # log(critic) - log(curraccu) = log(critic/curraccu)
             # ratios  = e^(ln(State2_actProbs)-ln(State1_actProbs)) =  e^ln(State2_actProbs/State1_actProbs)
             # ratios  = (State2_critic_actProbs/State1_actor_actProbs)
             # ratios  = next_critic_actprobs/curr_actions_prob = Pw(A1|S2)/Pw(A1|S1), where w is weights(theta)
-            ratios  = torch.exp(critic_actlogprobs - curr_actlogprobs.detach())
+            ratios  = torch.exp(epoch_actlogprobs - curr_actlogprobs.detach())
 
             #advantages is stdscore mode
             surr1       = ratios * advantages

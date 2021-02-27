@@ -71,13 +71,13 @@ class Actor_Critic(nn.Module):
         mats_std            = torch.diag_embed(acts_std).double().to(device)
         #distribute         = torch.distributions.MultivariateNormal(action_mu, cov_mat)
         distribute          = torch.distributions.MultivariateNormal(acts_mu, scale_tril=mats_std) #act_mu=center, scale_tril=width
-        critic_actlogprobs  = distribute.log_prob(actions) #logeX
+        epoch_actlogprobs   = distribute.log_prob(actions) #logeX
         entropy             = distribute.entropy() #entropy is uncertain percentage, value higher mean uncertain more
         critic_values       = self.network_critic(states) #c_values is V(s) in A3C theroy
 
         #if dimension can squeeze then tensor 3d to 2d.
         #EX: squeeze tensor[2,1,3] become to tensor[2,3]
-        return critic_actlogprobs, torch.squeeze(critic_values), entropy
+        return epoch_actlogprobs, torch.squeeze(critic_values), entropy
 
     # if is_terminals is false use Markov formula to replace last reward
     def predict_reward(self, next_state, gamedata, gamma):
@@ -141,14 +141,14 @@ class CPPO:
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             #cstate_value is V(s) in A3C theroy. critic network is another actor input state
-            critic_actlogprobs, critic_values, entropy = self.policy_ac.calculation(curr_states, curr_actions)
+            epoch_actlogprobs, critic_values, entropy = self.policy_ac.calculation(curr_states, curr_actions)
 
             # https://socratic.org/questions/what-is-the-derivative-of-e-lnx
             # log(critic) - log(curraccu) = log(critic/curraccu)
             # ratios  = e^(ln(State2_actProbs)-ln(State1_actProbs)) =  e^ln(State2_actProbs/State1_actProbs)
             # ratios  = (State2_critic_actProbs/State1_actor_actProbs)
             # ratios  = next_critic_actprobs/curr_actions_prob = Pw(A1|S2)/Pw(A1|S1), where w is weights(theta)
-            ratios  = torch.exp(critic_actlogprobs - curr_actlogprobs.detach())
+            ratios  = torch.exp(epoch_actlogprobs - curr_actlogprobs.detach())
 
             #advantages is stdscore mode
             surr1       = ratios * advantages
