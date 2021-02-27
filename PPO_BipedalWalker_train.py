@@ -189,7 +189,7 @@ if __name__ == '__main__':
     max_episodes    = 500000        # max training episodes
     max_timesteps   = 1500          # max timesteps in one episode
     update_timestep = 4000          # train_update policy every n timesteps
-    train_epochs    = 40            # train_update policy for K epochs
+    train_epochs    = 20            # train_update policy for K epochs
     action_std      = 0.5           # constant std for action distribution (Multivariate Normal)
     lr              = 0.0001        # parameters for Adam optimizer
     betas           = (0.9, 0.999)  # Adam β
