@@ -225,7 +225,7 @@ if __name__ == '__main__':
     max_episodes    = 50000         # max training episodes
     max_timesteps   = 1500          # max timesteps in one episode
     update_timestep = 2000          # train_update policy every n timesteps
-    train_epochs    = 4             # train_update policy for epochs
+    train_epochs    = 10            # train_update policy for epochs
     lr              = 0.0005        # learning rate
     betas           = (0.9, 0.999)  # Adam β
     gamma           = 0.99          # discount factor
