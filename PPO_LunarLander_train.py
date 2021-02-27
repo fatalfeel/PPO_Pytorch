@@ -101,29 +101,17 @@ class Actor_Critic(nn.Module):
         distribute          = torch.distributions.Categorical(critic_actprobs)
         critic_actlogprobs  = distribute.log_prob(actions) #logeX
         entropy             = distribute.entropy() # entropy is uncertain percentage, value higher mean uncertain more
-        next_critic_values  = self.network_critic(states) #c_values is V(s) in A3C theroy
+        critic_values       = self.network_critic(states) #c_values is V(s) in A3C theroy
 
         #if dimension can squeeze then tensor 3d to 2d.
         #EX: squeeze tensor[2,1,3] become to tensor[2,3]
-        return critic_actlogprobs, torch.squeeze(next_critic_values), entropy
+        return critic_actlogprobs, torch.squeeze(critic_values), entropy
 
     # if is_terminals is false use Markov formula to replace last reward
     def predict_reward(self, next_state, gamedata, gamma):
-        '''torchstate      = torch.from_numpy(next_state).double().to(device)
-        actor_actprob   = self.network_act(torchstate)  # tau(a|s) = P(a,s) 8 elements corresponds to one action
-        distribute      = torch.distributions.Categorical(actor_actprob)
-        action          = distribute.sample()
-        actlogprob      = distribute.log_prob(action)  # =lnX
-        next_value      = self.network_critic(torchstate)
-        data_value      = next_value.detach().cpu().data.numpy()[0]
-
-        gamedata.states.append(torchstate)
-        gamedata.actions.append(action)  # next action
-        gamedata.actorlogprobs.append(actlogprob)  # the action number corresponds to the action_probs into log
-        gamedata.rewards.append(data_value)
-        #gamedata.is_terminals[-1] = True   # make self.gamma * discounted_reward = 0 to keep last reward
-        gamedata.is_terminals.append(True)'''
-
+        ''' self.returns[-1] = next_value (next_value from critic network)
+            for step in reversed(range(self.rewards.size(0))):
+                self.returns[step] = self.rewards[step] + gamma * self.returns[step + 1] * self.masks[step + 1] '''
         if gamedata.is_terminals[-1] is False:
             torchstate = torch.from_numpy(next_state).double().to(device)
             next_value = self.network_critic(torchstate)
@@ -177,17 +165,17 @@ class CPPO:
 
         # critic_state_reward   = network_critic(curraccu_states)
         '''refer to a2c-ppo should modify like this
-           advantages = rollouts.returns[:-1] - rollouts.value_preds[:-1]
-           advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
-        critic_vpi  = self.policy_ac.network_critic(curr_states)
-        critic_vpi  = torch.squeeze(critic_vpi)
-        qsa_sub_vs  = returns - critic_vpi.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
-        advantages  = (qsa_sub_vs - qsa_sub_vs.mean()) / (qsa_sub_vs.std() + 1e-5)
+           advantages   = rollouts.returns[:-1] - rollouts.value_preds[:-1]
+           advantages   = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
+        curr_preds      = self.policy_ac.network_critic(curr_states) #faster than do every times in interact
+        curr_preds      = torch.squeeze(curr_preds)
+        rc_diff         = returns - curr_preds.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
+        advantages      = (rc_diff - rc_diff.mean()) / (rc_diff.std() + 1e-5)
 
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             #cstate_value is V(s) in A3C theroy. critic network weights as an actor feed state out reward value
-            critic_actlogprobs, next_critic_values, entropy = self.policy_ac.calculation(curr_states, curr_actions)
+            critic_actlogprobs, critic_values, entropy = self.policy_ac.calculation(curr_states, curr_actions)
 
             # https://socratic.org/questions/what-is-the-derivative-of-e-lnx
             # log(critic) - log(curraccu) = log(critic/curraccu)
@@ -209,13 +197,13 @@ class CPPO:
             # value_predict_loss is (value_predict_clip - MDP-reward)^2
             # value_critic_loss is (critical predict value - MDP-reward)^2
             # value_loss is 0.5 x select max items in (predict_loss or value_critic_loss) ex: A=[2,6] b=[4,5] torch max=>[4,6]
-            value_predict_clip  = critic_vpi.detach() + (next_critic_values - critic_vpi.detach()).clamp(-self.eps_clip, self.eps_clip)
+            value_predict_clip  = curr_preds.detach() + (critic_values - curr_preds.detach()).clamp(-self.eps_clip, self.eps_clip)
             value_predict_loss  = self.MseLoss(value_predict_clip, returns)
-            value_critic_loss   = self.MseLoss(next_critic_values, returns)
+            value_critic_loss   = self.MseLoss(critic_values, returns)
             value_loss          = 0.5 * torch.max(value_predict_loss, value_critic_loss)
 
-            # MseLoss is Mean Square Error = (target - output)^2, next_critic_values in first param follow libtorch rules
-            #loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(next_critic_values, returns) - 0.01*entropy
+            # MseLoss is Mean Square Error = (target - output)^2, critic_values in first param follow libtorch rules
+            #loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(critic_values, returns) - 0.01*entropy
             loss = -torch.min(surr1, surr2) + self.vloss_coef * value_loss - self.entropy_coef * entropy
 
             # take gradient step
