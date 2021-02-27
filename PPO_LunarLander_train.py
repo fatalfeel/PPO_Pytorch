@@ -219,10 +219,10 @@ if __name__ == '__main__':
     env_name        = "LunarLander-v2"
     # creating environment
     render          = False
-    solved_reward   = 230           # stop training if reach avg_reward > solved_reward
+    solved_reward   = 250           # stop training if reach avg_reward > solved_reward
     log_interval    = 20            # print avg reward in the interval
     h_neurons       = 64            # number of variables in hidden layer
-    max_episodes    = 50000         # max training episodes
+    max_episodes    = 200000        # max training episodes
     max_timesteps   = 1500          # max timesteps in one episode
     update_timestep = 2000          # train_update policy every n timesteps
     train_epochs    = 10            # train_update policy for epochs
