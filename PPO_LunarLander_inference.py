@@ -13,8 +13,8 @@ if __name__ == '__main__':
     save_gif        = False
     n_episodes      = 10000
     h_neurons       = 64                # number of variables in hidden layer
-    max_timesteps   = 400               # move 200 times rest game
-    train_epochs    = 4                 # update policy for K epochs
+    max_timesteps   = 400               # move 400 times rest game
+    train_epochs    = 10                # update policy for K epochs
     lr              = 0.0005
     betas           = (0.9, 0.999)
     gamma           = 0.99              # discount factor
