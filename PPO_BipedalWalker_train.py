@@ -80,15 +80,17 @@ class Actor_Critic(nn.Module):
         return epoch_actlogprobs, torch.squeeze(critic_values), entropy
 
     # if is_terminals is false use Markov formula to replace last reward
-    def predict_reward(self, next_state, gamedata, gamma):
+    def GetNextValue(self, next_state, gamedata):
         ''' self.returns[-1] = next_value (next_value from critic network)
             for step in reversed(range(self.rewards.size(0))):
                 self.returns[step] = self.rewards[step] + gamma * self.returns[step + 1] * self.masks[step + 1] '''
+        next_value = 0.0
         if gamedata.is_terminals[-1] is False:
             torchstate = torch.DoubleTensor(next_state.reshape(1, -1)).to(device)  # reshape(1,-1) 1d to 2d
             next_value = self.network_critic(torchstate)
-            data_value = next_value.detach().cpu().numpy()[0,0]
-            gamedata.rewards[-1] = gamedata.rewards[-1] + gamma * data_value
+            next_value = next_value.detach().cpu().numpy()[0,0]
+
+        return next_value
 
 class CPPO:
     def __init__(self, dim_states, dim_acts, action_std, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef):
@@ -112,15 +114,15 @@ class CPPO:
     #    tstates = torch.DoubleTensor(estates.reshape(1, -1)).double().to(device)
     #    return self.policy_curr.interact(tstates, gamedata).cpu().data.numpy().flatten()
 
-    def train_update(self, gamedata):
+    def train_update(self, gamedata, next_value):
         returns             = []
-        discounted_reward   = 0
+        discounted_reward   = next_value
         # Monte Carlo estimate of returns:
         for reward, is_terminal in zip(reversed(gamedata.rewards), reversed(gamedata.is_terminals)):
             if is_terminal:
                 discounted_reward = 0
             discounted_reward = reward + (self.gamma * discounted_reward)
-            returns.insert(0, discounted_reward)
+            returns.insert(0, discounted_reward) #always insert in first
 
         returns = torch.tensor(returns).double().to(device)
 
@@ -197,7 +199,7 @@ if __name__ == '__main__':
     eps_clip        = 0.2           # clip parameter for CPPO
     vloss_coef      = 0.5           # clip parameter for CPPO
     entropy_coef    = 0.01
-    predict_trick   = True          # trick shot make PPO get better action & reward
+    #predict_trick   = True         # trick shot make PPO get better action & reward
     #############################################
 
     # creating environment
@@ -234,10 +236,8 @@ if __name__ == '__main__':
 
             # train_update if its time
             if timestep % update_timestep == 0:
-                if predict_trick is True:
-                    ppo.policy_ac.predict_reward(envstate, gamedata, gamma)
-
-                ppo.train_update(gamedata)
+                next_value = ppo.policy_ac.GetNextValue(envstate, gamedata)
+                ppo.train_update(gamedata, next_value)
                 gamedata.clear_memory()
 
                 timestep = 0
