@@ -118,10 +118,11 @@ class CPPO:
     def train_update(self, gamedata, next_value):
         returns             = []
         discounted_reward   = next_value
-        # Monte Carlo estimate of returns:
+        # Monte Carlo estimate of state rewards:
         for reward, is_terminal in zip(reversed(gamedata.rewards), reversed(gamedata.is_terminals)):
             if is_terminal:
                 discounted_reward = 0
+            # R(τ) = gamma^n * τ(a|s)R(a,s) , n=1~k
             discounted_reward = reward + (self.gamma * discounted_reward)
             returns.insert(0, discounted_reward) #always insert in first
 
