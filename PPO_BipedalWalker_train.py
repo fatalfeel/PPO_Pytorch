@@ -13,7 +13,7 @@ class GameContent:
         self.rewards        = []
         self.is_terminals   = []
 
-    def clear_memory(self):
+    def ReleaseData(self):
         del self.actions[:]
         del self.states[:]
         del self.actorlogprobs[:]
@@ -80,15 +80,16 @@ class Actor_Critic(nn.Module):
         return epoch_actlogprobs, torch.squeeze(critic_values), entropy
 
     # if is_terminals is false use Markov formula to replace last reward
-    def GetNextValue(self, next_state, gamedata):
+    def GetNextValue(self, next_state, is_terminals):
         ''' self.returns[-1] = next_value (next_value from critic network)
             for step in reversed(range(self.rewards.size(0))):
                 self.returns[step] = self.rewards[step] + gamma * self.returns[step + 1] * self.masks[step + 1] '''
-        next_value = 0.0
-        if gamedata.is_terminals[-1] is False:
+        if is_terminals is False:
             torchstate = torch.DoubleTensor(next_state.reshape(1, -1)).to(device)  # reshape(1,-1) 1d to 2d
             next_value = self.network_critic(torchstate)
             next_value = next_value.detach().cpu().numpy()[0,0]
+        else:
+            next_value = 0.0
 
         return next_value
 
@@ -236,9 +237,9 @@ if __name__ == '__main__':
 
             # train_update if its time
             if timestep % update_timestep == 0:
-                next_value = ppo.policy_ac.GetNextValue(envstate, gamedata)
+                next_value = ppo.policy_ac.GetNextValue(envstate, gamedata.is_terminals[-1])
                 ppo.train_update(gamedata, next_value)
-                gamedata.clear_memory()
+                gamedata.ReleaseData()
 
                 timestep = 0
 

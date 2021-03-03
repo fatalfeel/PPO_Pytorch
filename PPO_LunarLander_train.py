@@ -108,15 +108,16 @@ class Actor_Critic(nn.Module):
         return epoch_actlogprobs, torch.squeeze(critic_values), entropy
 
     # if is_terminals is false use Markov formula to replace last reward
-    def GetNextValue(self, next_state, gamedata):
+    def GetNextValue(self, next_state, is_terminals):
         ''' self.returns[-1] = next_value (next_value from critic network)
             for step in reversed(range(self.rewards.size(0))):
                 self.returns[step] = self.rewards[step] + gamma * self.returns[step + 1] * self.masks[step + 1] '''
-        next_value = 0.0
-        if gamedata.is_terminals[-1] is False:
+        if is_terminals is False:
             torchstate = torch.from_numpy(next_state).double().to(device)
             next_value = self.network_critic(torchstate)
             next_value = next_value.detach().cpu().numpy()[0]
+        else:
+            next_value = 0.0
 
         return next_value
 
@@ -221,13 +222,13 @@ if __name__ == '__main__':
     env_name        = "LunarLander-v2"
     # creating environment
     render          = False
-    solved_reward   = 250           # stop training if reach avg_reward > solved_reward
+    solved_reward   = 270           # stop training if reach avg_reward > solved_reward
     log_interval    = 20            # print avg reward in the interval
     h_neurons       = 64            # number of variables in hidden layer
     max_episodes    = 200000        # max training episodes
     max_timesteps   = 1500          # max timesteps in one episode
     update_timestep = 2000          # train_update policy every n timesteps
-    train_epochs    = 10            # train_update policy for epochs
+    train_epochs    = 20            # train_update policy for epochs
     lr              = 0.0005        # learning rate
     betas           = (0.9, 0.999)  # Adam β
     gamma           = 0.99          # discount factor
@@ -271,7 +272,7 @@ if __name__ == '__main__':
 
             # train_update if its time
             if timestep % update_timestep == 0:
-                next_value = ppo.policy_ac.GetNextValue(envstate, gamedata)
+                next_value = ppo.policy_ac.GetNextValue(envstate, gamedata.is_terminals[-1])
                 ppo.train_update(gamedata, next_value)
                 gamedata.ReleaseData()
 
