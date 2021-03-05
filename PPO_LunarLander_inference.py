@@ -8,25 +8,24 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 if __name__ == '__main__':
     ############## Hyperparameters ##############
     env_name        = "LunarLander-v2"
-    # creating environment
     render          = True
     save_gif        = False
-    n_episodes      = 10000
-    h_neurons       = 64                # number of variables in hidden layer
-    max_timesteps   = 400               # move 400 times rest game
-    train_epochs    = 10                # update policy for K epochs
+    h_neurons       = 256           # number of variables in hidden layer
+    n_episodes      = 200000
+    max_timesteps   = 1000          # move 400 times rest game
+    train_epochs    = 10            # update policy for K epochs
     lr              = 0.0005
     betas           = (0.9, 0.999)
-    gamma           = 0.99              # discount factor
-    eps_clip        = 0.2               # clip parameter for PPO
-    vloss_coef      = 0.5  # clip parameter for PPO2
+    gamma           = 0.99          # discount factor
+    eps_clip        = 0.2           # clip parameter for PPO
+    vloss_coef      = 0.5           # clip parameter for PPO2
     entropy_coef    = 0.01
     #############################################
 
     # creating environment
-    env = gym.make(env_name)
-    dim_states = env.observation_space.shape[0]
-    dim_acts = 4
+    env         = gym.make(env_name)
+    dim_states  = env.observation_space.shape[0]
+    dim_acts    = 4
 
     gamedata    = GameContent()
     ppo         = CPPO(dim_states, dim_acts, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef)

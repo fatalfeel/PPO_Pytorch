@@ -21,21 +21,21 @@ class GameContent:
         del self.is_terminals[:]
 
 class Actor_Critic(nn.Module):
-    def __init__(self, dim_states, dim_acts, action_std):
+    def __init__(self, dim_states, dim_acts, action_std, h_neurons):
         super(Actor_Critic, self).__init__()
         # action mean range -1 to 1
-        self.network_act =  nn.Sequential(  nn.Linear(dim_states, 64),
+        self.network_act =  nn.Sequential(  nn.Linear(dim_states, h_neurons),
                                             nn.Tanh(),
-                                            nn.Linear(64, 32),
+                                            nn.Linear(h_neurons, h_neurons),
                                             nn.Tanh(),
-                                            nn.Linear(32, dim_acts),
-                                            nn.Tanh()  )
+                                            nn.Linear(h_neurons, dim_acts),
+                                            nn.Tanh()  ) #last nn.Tanh for normal mu
         # network_value
-        self.network_critic = nn.Sequential(nn.Linear(dim_states, 64),
+        self.network_critic = nn.Sequential(nn.Linear(dim_states, h_neurons),
                                             nn.Tanh(),
-                                            nn.Linear(64, 32),
+                                            nn.Linear(h_neurons, h_neurons),
                                             nn.Tanh(),
-                                            nn.Linear(32, 1) )
+                                            nn.Linear(h_neurons, 1) )
 
         #self.action_std = torch.full((dim_acts,), action_std*action_std).double().to(device)
         self.action_std  = torch.full((dim_acts,), action_std).double().to(device) #standard deviations
@@ -94,7 +94,7 @@ class Actor_Critic(nn.Module):
         return next_value
 
 class CPPO:
-    def __init__(self, dim_states, dim_acts, action_std, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef):
+    def __init__(self, dim_states, dim_acts, action_std, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef):
         self.lr             = lr
         self.betas          = betas
         self.gamma          = gamma
@@ -103,7 +103,7 @@ class CPPO:
         self.entropy_coef   = entropy_coef
         self.train_epochs   = train_epochs
 
-        self.policy_ac      = Actor_Critic(dim_states, dim_acts, action_std).double().to(device)
+        self.policy_ac      = Actor_Critic(dim_states, dim_acts, action_std, h_neurons).double().to(device)
         self.optimizer      = torch.optim.Adam(self.policy_ac.parameters(), lr=lr, betas=betas)
 
         #self.policy_curr = Actor_Critic(dim_states, dim_acts, action_std).double().to(device)
@@ -188,10 +188,11 @@ if __name__ == '__main__':
     ############## Hyperparameters ##############
     env_name        = "BipedalWalker-v3"
     render          = False
-    solved_reward   = 300           # stop training if avg_reward > solved_reward
+    solved_reward   = 280           # stop training if avg_reward > solved_reward
     log_interval    = 20            # print avg reward in the interval
-    max_episodes    = 500000        # max training episodes
-    max_timesteps   = 1500          # max timesteps in one episode
+    h_neurons       = 256           # number of variables in hidden layer
+    max_episodes    = 200000        # max training episodes
+    max_timesteps   = 2000          # max timesteps in one episode
     update_timestep = 4000          # train_update policy every n timesteps
     train_epochs    = 20            # train_update policy for K epochs
     action_std      = 0.5           # constant std for action distribution (Multivariate Normal)
@@ -210,7 +211,7 @@ if __name__ == '__main__':
     dim_acts    = env.action_space.shape[0]
 
     gamedata    = GameContent()
-    ppo         = CPPO(dim_states, dim_acts, action_std, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef)
+    ppo         = CPPO(dim_states, dim_acts, action_std, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef)
     ppo.policy_ac.train()
 
     # logging variables

@@ -60,11 +60,10 @@ class Actor_Critic(nn.Module):
         (2) use samples of first-person actions put in distribute.log_prob(actions) get critic actorlogprobs
         (3) ratios = e^log(critic_log_prob/currenr_log_prob) = e^(logcritic_log_prob-currenr_log_prob)'''
         self.network_act = nn.Sequential(nn.Linear(dim_states, h_neurons),
-                                        nn.Tanh(),
-                                        nn.Linear(h_neurons, h_neurons),
-                                        nn.Tanh(),
-                                        nn.Linear(h_neurons, dim_acts),
-                                        nn.Softmax(dim=-1))
+                                         nn.Tanh(),
+                                         nn.Linear(h_neurons, h_neurons),
+                                         nn.Tanh(),
+                                         nn.Linear(h_neurons, dim_acts))
 
         '''critic network is second-person perspective actor observer in the game, when game state in then reward out
         (1)game-state -> second-persion network -> Get Reward that call Value = V(s)'''
@@ -82,6 +81,7 @@ class Actor_Critic(nn.Module):
     def interact(self, envstate, gamedata):
         torchstate  = torch.from_numpy(envstate).double().to(device)
         actor_prob  = self.network_act(torchstate) #tau(a|s) = P(a,s) 8 elements corresponds to one action
+        actor_prob  = torch.softmax(actor_prob, dim=-1).double()
         distribute  = torch.distributions.Categorical(actor_prob)
         action      = distribute.sample()
         actlogprob  = distribute.log_prob(action) #logeX
@@ -98,6 +98,7 @@ class Actor_Critic(nn.Module):
     #in our example the mini_batch_size = states'size
     def calculation(self, states, actions):
         actor_probs         = self.network_act(states) #each current with one action probility
+        actor_probs         = torch.softmax(actor_probs, dim=-1).double()
         distribute          = torch.distributions.Categorical(actor_probs)
         epoch_actlogprobs   = distribute.log_prob(actions) #logeX
         entropy             = distribute.entropy() # entropy is uncertain percentage, value higher mean uncertain more
@@ -220,15 +221,14 @@ class CPPO:
 if __name__ == '__main__':
     ############## Hyperparameters ##############
     env_name        = "LunarLander-v2"
-    # creating environment
     render          = False
-    solved_reward   = 270           # stop training if reach avg_reward > solved_reward
+    solved_reward   = 280           # stop training if reach avg_reward > solved_reward
     log_interval    = 20            # print avg reward in the interval
-    h_neurons       = 64            # number of variables in hidden layer
+    h_neurons       = 256           # number of variables in hidden layer
     max_episodes    = 200000        # max training episodes
-    max_timesteps   = 1500          # max timesteps in one episode
+    max_timesteps   = 1000          # max timesteps in one episode
     update_timestep = 2000          # train_update policy every n timesteps
-    train_epochs    = 20            # train_update policy for epochs
+    train_epochs    = 10            # train_update policy for epochs
     lr              = 0.0001        # learning rate
     betas           = (0.9, 0.999)  # Adam β
     gamma           = 0.99          # discount factor

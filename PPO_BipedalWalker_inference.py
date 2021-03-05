@@ -8,14 +8,11 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 if __name__ == '__main__':
     ############## Hyperparameters ##############
     env_name        = "BipedalWalker-v3"
-    env             = gym.make(env_name)
-    dim_states      = env.observation_space.shape[0]
-    dim_acts        = env.action_space.shape[0]
-    
-    n_episodes      = 10000         # num of episodes to run
-    max_timesteps   = 1500          # max timesteps in one episode
     render          = True          # render the environment
     save_gif        = False         # png images are saved in gif folder
+    h_neurons       = 256           # number of variables in hidden layer
+    n_episodes      = 200000        # num of episodes to run
+    max_timesteps   = 2000          # max timesteps in one episode
     train_epochs    = 20            # update policy for K epochs
     action_std      = 0.5           # constant std for action distribution (Multivariate Normal)
     lr              = 0.0001  # parameters for Adam optimizer
@@ -25,9 +22,14 @@ if __name__ == '__main__':
     vloss_coef      = 0.5  # clip parameter for PPO2
     entropy_coef    = 0.01
     #############################################
+
+    # creating environment
+    env         = gym.make(env_name)
+    dim_states  = env.observation_space.shape[0]
+    dim_acts    = env.action_space.shape[0]
     
     gamedata    = GameContent()
-    ppo         = CPPO(dim_states, dim_acts, action_std, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef)
+    ppo         = CPPO(dim_states, dim_acts, action_std, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef)
     ppo.policy_ac.eval()
 
     directory = "./preTrained/"
