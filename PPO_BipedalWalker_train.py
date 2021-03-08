@@ -26,16 +26,16 @@ class Actor_Critic(nn.Module):
         # action mean range -1 to 1
         self.network_act =  nn.Sequential(  nn.Linear(dim_states, h_neurons),
                                             nn.Tanh(),
-                                            nn.Linear(h_neurons, h_neurons // 2),
+                                            nn.Linear(h_neurons, h_neurons),
                                             nn.ReLU(),
-                                            nn.Linear(h_neurons // 2, dim_acts),
+                                            nn.Linear(h_neurons, dim_acts),
                                             nn.Tanh()  ) #last nn.Tanh for normal mu
         # network_value
         self.network_critic = nn.Sequential(nn.Linear(dim_states, h_neurons),
                                             nn.Tanh(),
-                                            nn.Linear(h_neurons, h_neurons // 2),
+                                            nn.Linear(h_neurons, h_neurons),
                                             nn.Tanh(),
-                                            nn.Linear(h_neurons // 2, 1) )
+                                            nn.Linear(h_neurons, 1) )
 
         #self.action_std = torch.full((dim_acts,), action_std*action_std).double().to(device)
         self.action_std  = torch.full((dim_acts,), action_std).double().to(device) #standard deviations
