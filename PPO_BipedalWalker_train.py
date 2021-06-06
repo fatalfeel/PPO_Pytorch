@@ -129,15 +129,15 @@ class CPPO:
         returns = torch.tensor(returns).double().to(device)
 
         # convert list to tensor
-        step_states         = torch.squeeze(torch.stack(gamedata.states).double().to(device), 1).detach()
-        step_actions        = torch.squeeze(torch.stack(gamedata.actions).double().to(device), 1).detach()
-        step_actlogprobs    = torch.squeeze(torch.stack(gamedata.actorlogprobs).double().to(device), 1).detach()
+        old_states         = torch.squeeze(torch.stack(gamedata.states).double().to(device), 1).detach()
+        old_actions        = torch.squeeze(torch.stack(gamedata.actions).double().to(device), 1).detach()
+        old_actlogprobs    = torch.squeeze(torch.stack(gamedata.actorlogprobs).double().to(device), 1).detach()
 
         # critic_state_reward   = network_critic(curraccu_states)
         '''refer to a2c-ppo should modify like this
            advantages   = rollouts.returns[:-1] - rollouts.value_preds[:-1]
            advantages   = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
-        step_values     = self.policy_ac.network_critic(step_states) #faster than do every times in interact
+        step_values     = self.policy_ac.network_critic(old_states) #faster than do every times in interact
         step_values     = torch.squeeze(step_values)
         rv_diff         = returns - step_values.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
         advantages      = (rv_diff - rv_diff.mean()) / (rv_diff.std() + 1e-5)
@@ -145,14 +145,14 @@ class CPPO:
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
             #cstate_value is V(s) in A3C theroy. critic network weights as an actor feed state out
-            epoch_actlogprobs, critic_values, entropy = self.policy_ac.calculation(step_states, step_actions)
+            epoch_actlogprobs, critic_values, entropy = self.policy_ac.calculation(old_states, old_actions)
 
             # https://socratic.org/questions/what-is-the-derivative-of-e-lnx
             # log(critic) - log(curraccu) = log(critic/curraccu)
             # ratios  = e^(ln(State2_actProbs)-ln(State1_actProbs)) =  e^ln(State2_actProbs/State1_actProbs)
             # ratios  = (State2_critic_actProbs/State1_actor_actProbs)
             # ratios  = next_critic_actprobs/curr_actions_prob = Pw(A1|S2)/Pw(A1|S1), where w is weights(theta)
-            ratios  = torch.exp(epoch_actlogprobs - step_actlogprobs.detach())
+            ratios  = torch.exp(epoch_actlogprobs - old_actlogprobs.detach())
 
             #advantages is stdscore mode
             surr1   = ratios * advantages
