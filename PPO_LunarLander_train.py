@@ -100,7 +100,7 @@ class Actor_Critic(nn.Module):
         actor_probs         = self.network_act(states) #each current with one action probility
         actor_probs         = torch.softmax(actor_probs, dim=-1).double()
         distribute          = torch.distributions.Categorical(actor_probs)
-        epoch_actlogprobs   = distribute.log_prob(actions) #logeX
+        epoch_actlogprobs   = distribute.log_prob(actions) #natural log prob
         entropy             = distribute.entropy() # entropy is uncertain percentage, value higher mean uncertain more
         critic_values       = self.network_critic(states) #c_values is V(s) in A3C theroy
 
@@ -171,10 +171,10 @@ class CPPO:
         '''refer to a2c-ppo should modify like this
            advantages   = rollouts.returns[:-1] - rollouts.value_preds[:-1]
            advantages   = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
-        step_values     = self.policy_ac.network_critic(old_states) #faster than do every times in interact
-        step_values     = torch.squeeze(step_values)
-        rv_diff         = returns - step_values.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
-        advantages      = (rv_diff - rv_diff.mean()) / (rv_diff.std() + 1e-5)
+        old_values  = self.policy_ac.network_critic(old_states) #faster than do every times in interact
+        old_values  = torch.squeeze(old_values)
+        rv_diff     = returns - old_values.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
+        advantages  = (rv_diff - rv_diff.mean()) / (rv_diff.std() + 1e-5)
 
         # Optimize policy for K epochs:
         for _ in range(self.train_epochs):
@@ -183,8 +183,8 @@ class CPPO:
 
             # https://socratic.org/questions/what-is-the-derivative-of-e-lnx
             # log(critic) - log(curraccu) = log(critic/curraccu)
-            # ratios  = e^(ln(State2_actProbs)-ln(State1_actProbs)) =  e^ln(State2_actProbs/State1_actProbs)
-            # ratios  = (State2_critic_actProbs/State1_actor_actProbs)
+            # ratios  = e^(State2_natureLogActProbs-Stat1_natureLogActProbs)
+            # ratios  = State2_natureLogActProbs/State1_natureLogActProbs
             # ratios  = next_critic_actprobs/curr_actions_prob = Pw(A1|S2)/Pw(A1|S1), where w is weights(theta)
             ratios  = torch.exp(epoch_actlogprobs - old_actlogprobs.detach())
 
@@ -201,7 +201,7 @@ class CPPO:
             # value_predict_loss is (value_predict_clip - MDP-reward)^2
             # value_critic_loss is (critical predict value - MDP-reward)^2
             # value_loss is 0.5 x select max items in (predict_loss or value_critic_loss) ex: A=[2,6] b=[4,5] torch max=>[4,6]
-            value_predict_clip  = step_values.detach() + (critic_values - step_values.detach()).clamp(-self.eps_clip, self.eps_clip)
+            value_predict_clip  = old_values.detach() + (critic_values - old_values.detach()).clamp(-self.eps_clip, self.eps_clip)
             value_predict_loss  = self.MseLoss(value_predict_clip, returns)
             value_critic_loss   = self.MseLoss(critic_values, returns)
             value_loss          = 0.5 * torch.max(value_predict_loss, value_critic_loss)
