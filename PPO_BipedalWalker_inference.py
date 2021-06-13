@@ -26,7 +26,7 @@ if __name__ == '__main__':
     h_neurons       = 1024          # number of variables in hidden layer
     n_episodes      = 200000        # num of episodes to run
     max_timesteps   = 1300          # max timesteps in one episode
-    train_epochs    = 4            # train_update policy for K epochs
+    train_epochs    = 4             # train_update policy for K epochs
     lr              = 0.0001        # parameters for learning rate
     betas           = (0.9, 0.999)  # Adam β
     gamma           = 0.99          # discount factor

@@ -24,7 +24,7 @@ if __name__ == '__main__':
     save_gif        = False
     h_neurons       = 1024          # number of variables in hidden layer
     n_episodes      = 200000        # num of episodes to run
-    max_timesteps   = 400           # move 300 times rest game
+    max_timesteps   = 400           # max timesteps in one episode
     train_epochs    = 4             # update policy for K epochs
     lr              = 0.0005        # parameters for learning rate
     betas           = (0.9, 0.999)  # Adam β

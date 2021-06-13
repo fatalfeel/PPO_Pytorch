@@ -275,7 +275,7 @@ if __name__ == '__main__':
             avg_length  = int(total_length/log_interval)
             avg_reward  = int((running_reward/log_interval))
             print('Episode {} \t avg length: {} \t avg reward: {}'.format(i_episode, avg_length, avg_reward))
-            checkpoint =  {'state_dict':    ppo.policy_ac.state_dict(),
+            checkpoint = {'state_dict':     ppo.policy_ac.state_dict(),
                           'optimizer_dict': ppo.optimizer.state_dict(),
                           'episode':        i_episode}
             lastname = args.checkpoint_dir + '/PPO_{}_last.pth'.format(env_name)
@@ -284,7 +284,7 @@ if __name__ == '__main__':
 
         # save every 500 episodes
         if i_episode % 500 == 0:
-            checkpoint =  {'state_dict':    ppo.policy_ac.state_dict(),
+            checkpoint = {'state_dict':     ppo.policy_ac.state_dict(),
                           'optimizer_dict': ppo.optimizer.state_dict(),
                           'episode':        i_episode}
             pname       = args.checkpoint_dir + '/PPO_{}_episode_{}.pth'.format(env_name, i_episode)
