@@ -19,4 +19,3 @@
 # Refer to
 - https://github.com/nikhilbarhate99/PPO-PyTorch
 - https://github.com/ikostrikov/pytorch-a2c-ppo-acktr-gail
-- https://github.com/ASzot/ppo-pytorch
