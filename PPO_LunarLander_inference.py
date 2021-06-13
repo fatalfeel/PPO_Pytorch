@@ -1,21 +1,33 @@
+import argparse
+import torch
 import gym
 from PPO_LunarLander_train import GameContent, CPPO
 from PIL import Image
-import torch
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+def str2bool(b_str):
+    if b_str.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif b_str.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--checkpoint_dir', type=str,       default='./checkpoint', help='path to checkpoint')
+parser.add_argument('--cuda',           type=str2bool,  default=False)
+args = parser.parse_args()
+
+device = torch.device("cuda" if args.cuda else "cpu")
 
 if __name__ == '__main__':
     ############## Hyperparameters ##############
     env_name        = "LunarLander-v2"
     render          = True
     save_gif        = False
-    h_neurons       = 256           # number of variables in hidden layer
-    n_episodes      = 200000
-    max_timesteps   = 1000          # move 400 times rest game
-    train_epochs    = 10            # update policy for K epochs
-    lr              = 0.0005
-    betas           = (0.9, 0.999)
+    h_neurons       = 1024          # number of variables in hidden layer
+    n_episodes      = 200000        # num of episodes to run
+    max_timesteps   = 400           # move 300 times rest game
+    train_epochs    = 4             # update policy for K epochs
+    lr              = 0.0005        # parameters for learning rate
+    betas           = (0.9, 0.999)  # Adam β
     gamma           = 0.99          # discount factor
     eps_clip        = 0.2           # clip parameter for PPO
     vloss_coef      = 0.5           # clip parameter for PPO2
@@ -31,16 +43,15 @@ if __name__ == '__main__':
     ppo         = CPPO(dim_states, dim_acts, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef)
     ppo.policy_ac.eval()
 
-    directory   = "./preTrained/"
-    filename    = "PPO_{}.pth".format(env_name)
-
     # map_location=torch.device('cpu') for cpu only if you have cuda then cancel it
-    ppo.policy_ac.load_state_dict(torch.load(directory+filename, map_location=torch.device('cpu')))
-    
+    lastname    = args.checkpoint_dir + '/PPO_{}_last.pth'.format(env_name)
+    checkpoint  = torch.load(lastname)
+    ppo.policy_ac.load_state_dict(checkpoint['state_dict'])
+
     for ep in range(1, n_episodes+1):
         ep_reward = 0
         estates = env.reset()
-        for t in range(max_timesteps):
+        for ts in range(max_timesteps):
             action                      = ppo.policy_ac.interact(estates, gamedata)
             estates, reward, done, _    = env.step(action)
             ep_reward += reward
@@ -49,11 +60,11 @@ if __name__ == '__main__':
             if save_gif:
                  img = env.render(mode = 'rgb_array')
                  img = Image.fromarray(img)
-                 img.save('./gif/{}.jpg'.format(t))  
+                 img.save('./gif/{}.jpg'.format(ts))
             if done:
                 break
             
-        print('Episode: {}\tReward: {}'.format(ep, int(ep_reward)))
+        print('Episode: {} \t Reward: {}'.format(ep, int(ep_reward)))
         ep_reward = 0
         env.close()
 

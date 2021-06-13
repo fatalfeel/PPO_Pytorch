@@ -19,13 +19,27 @@ key 1 - right engine
 key 2 - main engine
 key 3 - left engine
 key 4 - nope'''
+import argparse
+import os
 
 import torch
 import torch.nn as nn
 import torch.distributions
 import gym
 
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+def str2bool(b_str):
+    if b_str.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif b_str.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--checkpoint_dir', type=str,       default='./checkpoint', help='path to checkpoint')
+parser.add_argument('--resume',         type=str2bool,  default=False)
+parser.add_argument('--cuda',           type=str2bool,  default=False)
+args = parser.parse_args()
+
+device = torch.device("cuda" if args.cuda else "cpu")
 
 class GameContent:
     def __init__(self):
@@ -135,11 +149,6 @@ class CPPO:
         self.policy_ac      = Actor_Critic(dim_states, dim_acts, h_neurons).double().to(device)
         self.optimizer      = torch.optim.Adam(self.policy_ac.parameters(), lr=lr, betas=betas)
 
-        #self.policy_curr   = Actor_Critic(dim_states, dim_acts, h_neurons).double().to(device)
-        #self.policy_curr.load_state_dict(self.policy_ac.state_dict())
-
-        self.MseLoss        = nn.MSELoss(reduction='none').double().to(device)
-
     def train_update(self, gamedata, next_value):
         returns             = []
         discounted_reward   = next_value
@@ -149,7 +158,7 @@ class CPPO:
                 discounted_reward = 0
             # R(τ) = gamma^n * τ(a|s)R(a,s) , n=1~k
             discounted_reward = reward + (self.gamma * discounted_reward)
-            returns.insert(0, discounted_reward) #always insert in first
+            returns.insert(0, discounted_reward) #always insert in the first
 
         returns = torch.tensor(returns).double().to(device)
 
@@ -202,17 +211,17 @@ class CPPO:
             # value_critic_loss is (critical predict value - MDP-reward)^2
             # value_loss is 0.5 x select max items in (predict_loss or value_critic_loss) ex: A=[2,6] b=[4,5] torch max=>[4,6]
             value_predict_clip  = old_values.detach() + (critic_values - old_values.detach()).clamp(-self.eps_clip, self.eps_clip)
-            value_predict_loss  = self.MseLoss(value_predict_clip, returns)
-            value_critic_loss   = self.MseLoss(critic_values, returns)
+            value_predict_loss  = (value_predict_clip - returns) ** 2
+            value_critic_loss   = (critic_values - returns) ** 2
             value_loss          = 0.5 * torch.max(value_predict_loss, value_critic_loss)
 
             # MseLoss is Mean Square Error = (target - output)^2, critic_values in first param follow libtorch rules
             # loss = -torch.min(surr1, surr2) + 0.5*self.MseLoss(critic_values, returns) - 0.01*entropy
-            loss = -torch.min(surr1, surr2) + self.vloss_coef * value_loss - self.entropy_coef * entropy
+            loss = -torch.min(surr1, surr2).mean() + self.vloss_coef * value_loss.mean() - self.entropy_coef * entropy.mean()
 
             # take gradient step
             self.optimizer.zero_grad()
-            loss.mean().backward()  #get grade.data
+            loss.backward()         #get grade.data
             self.optimizer.step()   #update grade.data by adam method which is smooth grade
 
         # Copy new weights into old policy:
@@ -222,21 +231,23 @@ if __name__ == '__main__':
     ############## Hyperparameters ##############
     env_name        = "LunarLander-v2"
     render          = False
-    solved_reward   = 280           # stop training if reach avg_reward > solved_reward
-    log_interval    = 20            # print avg reward in the interval
-    h_neurons       = 256           # number of variables in hidden layer
+    solved_reward   = 290           # don't change the topest avg score if more can not reach
+    h_neurons       = 1024          # number of variables in hidden layer
     max_episodes    = 200000        # max training episodes
-    max_timesteps   = 1000          # max timesteps in one episode
-    update_timestep = 2000          # train_update policy every n timesteps
-    train_epochs    = 10            # train_update policy for epochs
-    lr              = 0.0001        # learning rate
+    max_timesteps   = 400           # max timesteps in one episode
+    train_epochs    = 4             # train_update policy for K epochs
+    update_timestep = 2000          # train_update samples need big enough
+    log_interval    = 20            # print avg reward in the interval
+    lr              = 0.0001        # parameters for learning rate
     betas           = (0.9, 0.999)  # Adam β
     gamma           = 0.99          # discount factor
     eps_clip        = 0.2           # clip parameter for PPO2
     vloss_coef      = 0.5           # clip parameter for PPO2
     entropy_coef    = 0.01
-    #predict_trick   = True         # trick shot make PPO get better action & reward
+    s_episode       = 1
     #############################################
+    if not os.path.exists(args.checkpoint_dir):
+        os.makedirs(args.checkpoint_dir)
 
     # creating environment
     env         = gym.make(env_name)
@@ -247,15 +258,23 @@ if __name__ == '__main__':
     ppo         = CPPO(dim_states, dim_acts, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef)
     ppo.policy_ac.train()
 
+    if args.resume:
+        lastname    = args.checkpoint_dir + '/PPO_{}_last.pth'.format(env_name)
+        checkpoint  = torch.load(lastname)
+        ppo.policy_ac.load_state_dict(checkpoint['state_dict'])
+        ppo.optimizer.load_state_dict(checkpoint['optimizer_dict'])
+        s_episode   = checkpoint['episode']
+
     # logging variables
-    running_reward  = 0
-    avg_length      = 0
+    ts              = 0
     timestep        = 0
+    running_reward  = 0
+    total_length    = 0
 
     # training loop
-    for i_episode in range(1, max_episodes+1):
+    for i_episode in range(s_episode, max_episodes+1):
         envstate = env.reset() #Done-0 State-0
-        for t in range(max_timesteps):
+        for ts in range(max_timesteps):
             timestep += 1
 
             # Running policy_current: #Done-0 State-0 Act-0
@@ -264,6 +283,8 @@ if __name__ == '__main__':
             # Done-1 State-1 Act-0 R-0
             envstate, reward, done, _ = env.step(action)
 
+            running_reward += reward
+
             # one reward R(τ) = τ(a|s)R(a,s) in a certain state select an action and return the reward
             gamedata.rewards.append(reward)
 
@@ -271,35 +292,45 @@ if __name__ == '__main__':
             gamedata.is_terminals.append(done)
 
             # train_update if its time
-            if timestep % update_timestep == 0:
+            if timestep >= update_timestep:
                 next_value = ppo.policy_ac.GetNextValue(envstate, gamedata.is_terminals[-1])
                 ppo.train_update(gamedata, next_value)
                 gamedata.ReleaseData()
-
                 timestep = 0
 
-            running_reward += reward
             if render:
                 env.render()
+
             if done:
                 break
 
-        avg_length += t
+        total_length += (ts+1)
 
-        # stop training if avg_reward > solved_reward
         if running_reward > (log_interval*solved_reward):
             print("########## Solved! ##########")
-            torch.save(ppo.policy_ac.state_dict(), './PPO_{}.pth'.format(env_name))
+            avg_length  = int(total_length/log_interval)
+            avg_reward  = int((running_reward/log_interval))
+            print('Episode {} \t avg length: {} \t avg reward: {}'.format(i_episode, avg_length, avg_reward))
+            checkpoint = {'state_dict':     ppo.policy_ac.state_dict(),
+                          'optimizer_dict': ppo.optimizer.state_dict(),
+                          'episode':        i_episode}
+            lastname = args.checkpoint_dir + '/PPO_{}_last.pth'.format(env_name)
+            torch.save(checkpoint, lastname)
             break
 
+        # save every 500 episodes
         if i_episode % 500 == 0:
-            torch.save(ppo.policy_ac.state_dict(), './PPO_{}_episode_{}.pth'.format(env_name, i_episode))
-            
-        # logging
+            checkpoint = {'state_dict':     ppo.policy_ac.state_dict(),
+                          'optimizer_dict': ppo.optimizer.state_dict(),
+                          'episode':        i_episode}
+            pname       = args.checkpoint_dir + '/PPO_{}_episode_{}.pth'.format(env_name, i_episode)
+            torch.save(checkpoint, pname)
+            lastname    = args.checkpoint_dir + '/PPO_{}_last.pth'.format(env_name)
+            torch.save(checkpoint, lastname)
+
         if i_episode % log_interval == 0:
-            avg_length = int(avg_length/log_interval)
-            running_reward = int((running_reward/log_interval))
-            
-            print('Episode {} \t avg length: {} \t reward: {}'.format(i_episode, avg_length, running_reward))
-            running_reward = 0
-            avg_length = 0
+            avg_length  = int(total_length/log_interval)
+            avg_reward  = int((running_reward/log_interval))
+            print('Episode {} \t avg length: {} \t avg reward: {}'.format(i_episode, avg_length, avg_reward))
+            running_reward  = 0
+            total_length    = 0
