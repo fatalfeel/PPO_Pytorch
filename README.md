@@ -1,48 +1,20 @@
-# PPO-PyTorch
-PPO source referring: 
+# Preinstall box2d package
+- pip3 install box2d
 
-https://github.com/nikhilbarhate99/PPO-PyTorch
+# Run
+- python3 ./PPO_LunarLander_train.py --cuda True
+- python3 ./PPO_LunarLander_train.py --cuda True --resume True
+- python3 ./PPO_LunarLander_inference.py --cuda True
+- pythin3 ./PPO_BipedalWalker_train.py --cuda True
+- pythin3 ./PPO_BipedalWalker_train.py --cuda True
 
-https://github.com/ASzot/ppo-pytorch
+# Lessons
+- https://fatalfeel.blogspot.com/2013/12/ppo-and-awr-guiding.html
 
-Gym main source: https://github.com/openai/gym/tree/master/gym
+# C++ version
+- https://github.com/fatalfeel/PPO_libtorch
 
-Integrated PPO and Gym source:
-
-(a)Modify some crash problem with weight and float
-
-(b)Value function can not do backpropagation fixed
-
-(c)Remove redundant network
-
-(d)Add trick shot method
-
-Preinstall
-
-1.python3 version >=3.7
-
-refer to
-
-https://fatalfeel.blogspot.com/2019/12/ai-with-cuda-install-step-and-yolov3-in.html
-
-2.pytorch package
-
-https://pytorch.org
-
-3.box2d package
-
-pip3 install box2d
-
-4.C++ version
-
-https://github.com/fatalfeel/PPO_libtorch
-
-!!!PPO Lessons!!!
-
-From beginning to full mathematics with python examples
-
-https://fatalfeel.blogspot.com/2013/12/ppo-and-awr-guiding.html
-
-PS:Will transfer PPO to libtorch C++ coming soon
-
-https://fatalfeel.blogspot.com/2020/06/building-libtorch-and-numpy-in-c.html
+# Refer to
+- https://github.com/nikhilbarhate99/PPO-PyTorch
+- https://github.com/ikostrikov/pytorch-a2c-ppo-acktr-gail
+- https://github.com/ASzot/ppo-pytorch
