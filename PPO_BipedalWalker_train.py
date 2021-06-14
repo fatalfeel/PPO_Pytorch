@@ -201,7 +201,7 @@ if __name__ == '__main__':
     max_episodes    = 200000        # max training episodes
     max_timesteps   = 1300          # max timesteps in one episode
     train_epochs    = 4             # train_update policy for K epochs
-    update_timestep = 8000          # train_update samples need big enough
+    update_timestep = 8000          # train_update samples need 8*avg_length
     log_interval    = 20            # print avg reward in the interval
     lr              = 0.0001        # parameters for learning rate
     betas           = (0.9, 0.999)  # Adam β

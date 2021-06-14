@@ -231,12 +231,12 @@ if __name__ == '__main__':
     ############## Hyperparameters ##############
     env_name        = "LunarLander-v2"
     render          = False
-    solved_reward   = 290           # don't change the topest avg score if more can not reach
+    solved_reward   = 285           # don't change the topest avg score if more can not reach
     h_neurons       = 1024          # number of variables in hidden layer
     max_episodes    = 200000        # max training episodes
     max_timesteps   = 400           # max timesteps in one episode
     train_epochs    = 4             # train_update policy for K epochs
-    update_timestep = 2000          # train_update samples need big enough
+    update_timestep = 1600          # train_update samples need 8*avg_length
     log_interval    = 20            # print avg reward in the interval
     lr              = 0.0001        # parameters for learning rate
     betas           = (0.9, 0.999)  # Adam β
