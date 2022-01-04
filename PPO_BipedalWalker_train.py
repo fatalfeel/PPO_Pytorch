@@ -1,4 +1,6 @@
 import argparse
+import os
+
 import torch
 import torch.nn as nn
 import torch.distributions
@@ -212,6 +214,9 @@ if __name__ == '__main__':
     action_std      = 0.5           # constant std for action distribution (Multivariate Normal)
     s_episode       = 1
     #############################################
+    #if not os.path.exists(args.checkpoint_dir):
+    #    os.makedirs(args.checkpoint_dir)
+    os.makedirs(args.checkpoint_dir, exist_ok=True)
 
     # creating environment
     env         = gym.make(env_name)

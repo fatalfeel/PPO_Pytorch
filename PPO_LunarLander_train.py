@@ -246,8 +246,9 @@ if __name__ == '__main__':
     entropy_coef    = 0.01
     s_episode       = 1
     #############################################
-    if not os.path.exists(args.checkpoint_dir):
-        os.makedirs(args.checkpoint_dir)
+    #if not os.path.exists(args.checkpoint_dir):
+    #    os.makedirs(args.checkpoint_dir)
+    os.makedirs(args.checkpoint_dir, exist_ok=True)
 
     # creating environment
     env         = gym.make(env_name)
