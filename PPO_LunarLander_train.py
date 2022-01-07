@@ -234,10 +234,11 @@ if __name__ == '__main__':
     solved_reward   = 285           # don't change the topest avg score if more can not reach
     h_neurons       = 1024          # number of variables in hidden layer
     max_episodes    = 200000        # max training episodes
-    max_timesteps   = 400           # max timesteps in one episode
+    max_timesteps   = 500           # max timesteps in one episode
     train_epochs    = 4             # train_update policy for K epochs
-    update_timestep = 1600          # train_update samples need 8*avg_length
-    log_interval    = 20            # print avg reward in the interval
+    update_timestep = 2400          # train_update samples need 8*best_length(300)
+    epoch_save_freq = 100
+    log_interval    = 10            # print avg reward in the interval
     lr              = 0.0001        # parameters for learning rate
     betas           = (0.9, 0.999)  # Adam β
     gamma           = 0.99          # discount factor
@@ -319,8 +320,8 @@ if __name__ == '__main__':
             torch.save(checkpoint, lastname)
             break
 
-        # save every 500 episodes
-        if i_episode % 500 == 0:
+        # save every epoch_save_freq episodes
+        if i_episode % epoch_save_freq == 0:
             checkpoint = {'state_dict':     ppo.policy_ac.state_dict(),
                           'optimizer_dict': ppo.optimizer.state_dict(),
                           'episode':        i_episode}

@@ -24,9 +24,9 @@ if __name__ == '__main__':
     save_gif        = False
     h_neurons       = 1024          # number of variables in hidden layer
     n_episodes      = 200000        # num of episodes to run
-    max_timesteps   = 400           # max timesteps in one episode
+    max_timesteps   = 500           # max timesteps in one episode
     train_epochs    = 4             # update policy for K epochs
-    lr              = 0.0005        # parameters for learning rate
+    lr              = 0.0001        # parameters for learning rate
     betas           = (0.9, 0.999)  # Adam β
     gamma           = 0.99          # discount factor
     eps_clip        = 0.2           # clip parameter for PPO

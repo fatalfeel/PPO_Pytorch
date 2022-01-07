@@ -203,8 +203,9 @@ if __name__ == '__main__':
     max_episodes    = 200000        # max training episodes
     max_timesteps   = 1300          # max timesteps in one episode
     train_epochs    = 10            # train_update policy for K epochs
-    update_timestep = 8000          # train_update samples need 8*avg_length
-    log_interval    = 20            # print avg reward in the interval
+    update_timestep = 8000          # train_update samples need 8*best_length(1000)
+    epoch_save_freq = 100
+    log_interval    = 10            # print avg reward in the interval
     lr              = 0.0001        # parameters for learning rate
     betas           = (0.9, 0.999)  # Adam β
     gamma           = 0.99          # discount factor
@@ -287,8 +288,8 @@ if __name__ == '__main__':
             torch.save(checkpoint, lastname)
             break
 
-        # save every 500 episodes
-        if i_episode % 500 == 0:
+        # save every epoch_save_freq episodes
+        if i_episode % epoch_save_freq == 0:
             checkpoint = {'state_dict':     ppo.policy_ac.state_dict(),
                           'optimizer_dict': ppo.optimizer.state_dict(),
                           'episode':        i_episode}
