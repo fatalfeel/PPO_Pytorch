@@ -288,6 +288,14 @@ if __name__ == '__main__':
             torch.save(checkpoint, lastname)
             break
 
+        # logging
+        if i_episode % log_interval == 0:
+            avg_length  = int(total_length/log_interval)
+            avg_reward  = int((running_reward/log_interval))
+            print('Episode {} \t avg length: {} \t avg reward: {}'.format(i_episode, avg_length, avg_reward))
+            running_reward  = 0
+            total_length    = 0
+
         # save every epoch_save_freq episodes
         if i_episode % epoch_save_freq == 0:
             checkpoint = {'state_dict':     ppo.policy_ac.state_dict(),
@@ -297,11 +305,4 @@ if __name__ == '__main__':
             torch.save(checkpoint, pname)
             lastname    = args.checkpoint_dir + '/PPO_{}_last.pth'.format(env_name)
             torch.save(checkpoint, lastname)
-
-        # logging
-        if i_episode % log_interval == 0:
-            avg_length  = int(total_length/log_interval)
-            avg_reward  = int((running_reward/log_interval))
-            print('Episode {} \t avg length: {} \t avg reward: {}'.format(i_episode, avg_length, avg_reward))
-            running_reward  = 0
-            total_length    = 0
+            print('save ' + pname)
