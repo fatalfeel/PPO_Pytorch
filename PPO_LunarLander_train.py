@@ -39,8 +39,6 @@ parser.add_argument('--resume',         type=str2bool,  default=False)
 parser.add_argument('--cuda',           type=str2bool,  default=False)
 args = parser.parse_args()
 
-device = torch.device("cuda" if args.cuda else "cpu")
-
 class GameContent:
     def __init__(self):
         self.actions        = []
@@ -57,7 +55,7 @@ class GameContent:
         del self.is_terminals[:]
 
 class Actor_Critic(nn.Module):
-    def __init__(self, dim_states, dim_acts, h_neurons):
+    def __init__(self, dim_states, dim_acts, h_neurons, device):
         super(Actor_Critic, self).__init__()
 
         ###game is env = gym.make(env_name)
@@ -77,7 +75,7 @@ class Actor_Critic(nn.Module):
                                          nn.Tanh(),
                                          nn.Linear(h_neurons, h_neurons),
                                          nn.Tanh(),
-                                         nn.Linear(h_neurons, dim_acts))
+                                         nn.Linear(h_neurons, dim_acts)).double().to(device)
 
         '''critic network is second-person perspective actor observer in the game, when game state in then reward out
         (1)game-state -> second-persion network -> Get Reward that call Value = V(s)'''
@@ -85,7 +83,8 @@ class Actor_Critic(nn.Module):
                                             nn.Tanh(),
                                             nn.Linear(h_neurons, h_neurons),
                                             nn.Tanh(),
-                                            nn.Linear(h_neurons, 1))
+                                            nn.Linear(h_neurons, 1)).double().to(device)
+        self.device         = device
         
     def forward(self):
         raise NotImplementedError
@@ -93,7 +92,7 @@ class Actor_Critic(nn.Module):
     #https://pytorch.org/docs/stable/distributions.html
     #Categorical distribution follow actor_prob which sum is 1.0 then sample out your action also do entropy
     def interact(self, envstate, gamedata):
-        torchstate  = torch.from_numpy(envstate).double().to(device)
+        torchstate  = torch.from_numpy(envstate).double().to(self.device)
         actor_prob  = self.network_act(torchstate) #tau(a|s) = P(a,s) 8 elements corresponds to one action
         actor_prob  = torch.softmax(actor_prob, dim=-1).double()
         distribute  = torch.distributions.Categorical(actor_prob)
@@ -128,7 +127,7 @@ class Actor_Critic(nn.Module):
             for step in reversed(range(self.rewards.size(0))):
                 self.returns[step] = self.rewards[step] + gamma * self.returns[step + 1] * self.masks[step + 1] '''
         if is_terminals is False:
-            torchstate = torch.from_numpy(next_state).double().to(device)
+            torchstate = torch.from_numpy(next_state).double().to(self.device)
             next_value = self.network_critic(torchstate)
             next_value = next_value.detach().cpu().numpy()[0]
         else:
@@ -137,7 +136,7 @@ class Actor_Critic(nn.Module):
         return next_value
 
 class CPPO:
-    def __init__(self, dim_states, dim_acts, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef):
+    def __init__(self, dim_states, dim_acts, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef, device):
         self.lr             = lr
         self.betas          = betas
         self.gamma          = gamma
@@ -146,8 +145,9 @@ class CPPO:
         self.entropy_coef   = entropy_coef
         self.train_epochs   = train_epochs
 
-        self.policy_ac      = Actor_Critic(dim_states, dim_acts, h_neurons).double().to(device)
+        self.policy_ac      = Actor_Critic(dim_states, dim_acts, h_neurons, device)
         self.optimizer      = torch.optim.Adam(self.policy_ac.parameters(), lr=lr, betas=betas)
+        self.device         = device
 
     def train_update(self, gamedata, next_value):
         returns             = []
@@ -160,7 +160,7 @@ class CPPO:
             discounted_reward = reward + (self.gamma * discounted_reward)
             returns.insert(0, discounted_reward) #always insert in the first
 
-        returns = torch.tensor(returns).double().to(device)
+        returns = torch.tensor(returns).double().to(self.device)
 
         '''returns.mean() is E[R(τ)]
         returns.std on torch is {1/(n-1) * Σ(x - x_average)} ** 0.5  (x ** 0.5 = x^0.5)
@@ -172,9 +172,9 @@ class CPPO:
 
         # convert list to tensor
         # torch.stack is combine many tensor 1D to 2D
-        old_states      = torch.stack(gamedata.states).double().to(device).detach()
-        old_actions     = torch.stack(gamedata.actions).double().to(device).detach()
-        old_actlogprobs = torch.stack(gamedata.actorlogprobs).double().to(device).detach()
+        old_states      = torch.stack(gamedata.states).double().to(self.device).detach()
+        old_actions     = torch.stack(gamedata.actions).double().to(self.device).detach()
+        old_actlogprobs = torch.stack(gamedata.actorlogprobs).double().to(self.device).detach()
 
         # critic_state_reward   = network_critic(curraccu_states)
         '''refer to a2c-ppo should modify like this
@@ -245,8 +245,9 @@ if __name__ == '__main__':
     eps_clip        = 0.2           # clip parameter for PPO2
     vloss_coef      = 0.5           # clip parameter for PPO2
     entropy_coef    = 0.01
-    s_episode       = 1
+    s_episode       = 0
     #############################################
+    device = torch.device("cuda" if args.cuda else "cpu")
     #if not os.path.exists(args.checkpoint_dir):
     #    os.makedirs(args.checkpoint_dir)
     os.makedirs(args.checkpoint_dir, exist_ok=True)
@@ -257,7 +258,7 @@ if __name__ == '__main__':
     dim_acts    = 4  # 4 action directions
 
     gamedata    = GameContent()
-    ppo         = CPPO(dim_states, dim_acts, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef)
+    ppo         = CPPO(dim_states, dim_acts, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef, device)
     ppo.policy_ac.train()
 
     if args.resume:
@@ -274,7 +275,7 @@ if __name__ == '__main__':
     total_length    = 0
 
     # training loop
-    for i_episode in range(s_episode, max_episodes+1):
+    for i_episode in range(s_episode+1, max_episodes+1):
         envstate = env.reset() #Done-0 State-0
         for ts in range(max_timesteps):
             timestep += 1

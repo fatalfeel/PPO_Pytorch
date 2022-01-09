@@ -15,8 +15,6 @@ parser.add_argument('--checkpoint_dir', type=str,       default='./checkpoint', 
 parser.add_argument('--cuda',           type=str2bool,  default=False)
 args = parser.parse_args()
 
-device = torch.device("cuda" if args.cuda else "cpu")
-
 if __name__ == '__main__':
     ############## Hyperparameters ##############
     env_name        = "LunarLander-v2"
@@ -33,6 +31,7 @@ if __name__ == '__main__':
     vloss_coef      = 0.5           # clip parameter for PPO2
     entropy_coef    = 0.01
     #############################################
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     # creating environment
     env         = gym.make(env_name)
@@ -40,7 +39,7 @@ if __name__ == '__main__':
     dim_acts    = 4
 
     gamedata    = GameContent()
-    ppo         = CPPO(dim_states, dim_acts, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef)
+    ppo         = CPPO(dim_states, dim_acts, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef, device)
     ppo.policy_ac.eval()
 
     # map_location=torch.device('cpu') for cpu only if you have cuda then cancel it
@@ -65,6 +64,7 @@ if __name__ == '__main__':
                 break
             
         print('Episode: {} \t Reward: {}'.format(ep, int(ep_reward)))
+        gamedata.ReleaseData()
         ep_reward = 0
         env.close()
 

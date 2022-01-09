@@ -16,8 +16,6 @@ parser.add_argument('--checkpoint_dir', type=str,       default='./checkpoint', 
 parser.add_argument('--cuda',           type=str2bool,  default=False)
 args = parser.parse_args()
 
-device = torch.device("cuda" if args.cuda else "cpu")
-
 if __name__ == '__main__':
     ############## Hyperparameters ##############
     env_name        = "BipedalWalker-v3"
@@ -35,6 +33,7 @@ if __name__ == '__main__':
     entropy_coef    = 0.01
     action_std      = 0.5           # constant std for action distribution (Multivariate Normal)
     #############################################
+    device = torch.device("cuda" if args.cuda else "cpu")
 
     # creating environment
     env         = gym.make(env_name)
@@ -42,7 +41,7 @@ if __name__ == '__main__':
     dim_acts    = env.action_space.shape[0]
     
     gamedata    = GameContent()
-    ppo         = CPPO(dim_states, dim_acts, action_std, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef)
+    ppo         = CPPO(dim_states, dim_acts, action_std, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef, device)
     ppo.policy_ac.eval()
 
     # map_location=torch.device('cpu') for cpu only if you have cuda then cancel it
@@ -68,5 +67,6 @@ if __name__ == '__main__':
                 break
             
         print('Episode: {} \t Reward: {}'.format(ep, int(ep_reward)))
+        gamedata.ReleaseData()
         ep_reward = 0
         env.close()

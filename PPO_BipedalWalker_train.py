@@ -18,8 +18,6 @@ parser.add_argument('--resume',         type=str2bool,  default=False)
 parser.add_argument('--cuda',           type=str2bool,  default=False)
 args = parser.parse_args()
 
-device = torch.device("cuda" if args.cuda else "cpu")
-
 class GameContent:
     def __init__(self):
         self.actions        = []
@@ -36,24 +34,25 @@ class GameContent:
         del self.is_terminals[:]
 
 class Actor_Critic(nn.Module):
-    def __init__(self, dim_states, dim_acts, action_std, h_neurons):
+    def __init__(self, dim_states, dim_acts, action_std, h_neurons, device):
         super(Actor_Critic, self).__init__()
         # action mean range -1 to 1
-        self.network_act = nn.Sequential(nn.Linear(dim_states, h_neurons),
-                                         nn.Tanh(),
-                                         nn.Linear(h_neurons, h_neurons),
-                                         nn.Tanh(),
-                                         nn.Linear(h_neurons, dim_acts),
-                                         nn.Tanh()) #must add nn.Tanh in tail for normal mu
+        self.network_act    = nn.Sequential(nn.Linear(dim_states, h_neurons),
+                                            nn.Tanh(),
+                                            nn.Linear(h_neurons, h_neurons),
+                                            nn.Tanh(),
+                                            nn.Linear(h_neurons, dim_acts),
+                                            nn.Tanh()).double().to(device) #must add nn.Tanh in tail for normal mu
         # network_value
         self.network_critic = nn.Sequential(nn.Linear(dim_states, h_neurons),
                                             nn.Tanh(),
                                             nn.Linear(h_neurons, h_neurons),
                                             nn.Tanh(),
-                                            nn.Linear(h_neurons, 1))
+                                            nn.Linear(h_neurons, 1)).double().to(device)
 
         #self.action_std = torch.full((dim_acts,), action_std*action_std).double().to(device)
-        self.action_std  = torch.full((dim_acts,), action_std).double().to(device) #standard deviations
+        self.action_std     = torch.full((dim_acts,), action_std).double().to(device) #standard deviations
+        self.device         = device
 
     def forward(self):
         raise NotImplementedError
@@ -61,9 +60,9 @@ class Actor_Critic(nn.Module):
     # https://pytorch.org/docs/stable/distributions.html
     # backpropagation conditions are continue and differential. Sampling probs need in one distribution
     def interact(self, envstate, gamedata):
-        torchstate      = torch.DoubleTensor(envstate.reshape(1, -1)).to(device) #reshape(1,-1) 1d to 2d
+        torchstate      = torch.DoubleTensor(envstate.reshape(1, -1)).to(self.device) #reshape(1,-1) 1d to 2d
         act_mu          = self.network_act(torchstate)
-        std_mat         = torch.diag(self.action_std).double().to(device) #transfer to matrix
+        std_mat         = torch.diag(self.action_std).double().to(self.device) #transfer to matrix
         #distribute     = torch.distributions.MultivariateNormal(action_mu, cov_mat)
         distribute      = torch.distributions.MultivariateNormal(act_mu, scale_tril=std_mat) #act_mu=center, scale_tril=width
         action          = distribute.sample()
@@ -83,7 +82,7 @@ class Actor_Critic(nn.Module):
     def calculation(self, states, actions):
         acts_mu             = self.network_act(states)
         acts_std            = self.action_std.expand_as(acts_mu)
-        mats_std            = torch.diag_embed(acts_std).double().to(device)
+        mats_std            = torch.diag_embed(acts_std).double().to(self.device)
         #distribute         = torch.distributions.MultivariateNormal(action_mu, cov_mat)
         distribute          = torch.distributions.MultivariateNormal(acts_mu, scale_tril=mats_std) #act_mu=center, scale_tril=width
         epoch_actlogprobs   = distribute.log_prob(actions) #natural log prob
@@ -100,7 +99,7 @@ class Actor_Critic(nn.Module):
             for step in reversed(range(self.rewards.size(0))):
                 self.returns[step] = self.rewards[step] + gamma * self.returns[step + 1] * self.masks[step + 1] '''
         if is_terminals is False:
-            torchstate = torch.DoubleTensor(next_state.reshape(1, -1)).to(device)  # reshape(1,-1) 1d to 2d
+            torchstate = torch.DoubleTensor(next_state.reshape(1, -1)).to(self.device)  # reshape(1,-1) 1d to 2d
             next_value = self.network_critic(torchstate)
             next_value = next_value.detach().cpu().numpy()[0,0]
         else:
@@ -109,7 +108,7 @@ class Actor_Critic(nn.Module):
         return next_value
 
 class CPPO:
-    def __init__(self, dim_states, dim_acts, action_std, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef):
+    def __init__(self, dim_states, dim_acts, action_std, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef, device):
         self.lr             = lr
         self.betas          = betas
         self.gamma          = gamma
@@ -118,12 +117,9 @@ class CPPO:
         self.entropy_coef   = entropy_coef
         self.train_epochs   = train_epochs
 
-        self.policy_ac      = Actor_Critic(dim_states, dim_acts, action_std, h_neurons).double().to(device)
+        self.policy_ac      = Actor_Critic(dim_states, dim_acts, action_std, h_neurons, device)
         self.optimizer      = torch.optim.Adam(self.policy_ac.parameters(), lr=lr, betas=betas)
-
-        #self.policy_curr = Actor_Critic(dim_states, dim_acts, action_std).double().to(device)
-        #self.policy_curr.load_state_dict(self.policy_ac.state_dict())
-        #self.MseLoss        = nn.MSELoss(reduction='none').double().to(device)
+        self.device         = device
 
     def train_update(self, gamedata, next_value):
         returns             = []
@@ -136,12 +132,12 @@ class CPPO:
             discounted_reward = reward + (self.gamma * discounted_reward)
             returns.insert(0, discounted_reward) #always insert in the first
 
-        returns = torch.tensor(returns).double().to(device)
+        returns = torch.tensor(returns).double().to(self.device)
 
         # convert list to tensor
-        old_states         = torch.squeeze(torch.stack(gamedata.states).double().to(device), 1).detach()
-        old_actions        = torch.squeeze(torch.stack(gamedata.actions).double().to(device), 1).detach()
-        old_actlogprobs    = torch.squeeze(torch.stack(gamedata.actorlogprobs).double().to(device), 1).detach()
+        old_states         = torch.squeeze(torch.stack(gamedata.states).double().to(self.device), 1).detach()
+        old_actions        = torch.squeeze(torch.stack(gamedata.actions).double().to(self.device), 1).detach()
+        old_actlogprobs    = torch.squeeze(torch.stack(gamedata.actorlogprobs).double().to(self.device), 1).detach()
 
         # critic_state_reward   = network_critic(curraccu_states)
         '''refer to a2c-ppo should modify like this
@@ -213,8 +209,9 @@ if __name__ == '__main__':
     vloss_coef      = 0.5           # clip parameter for PPO2
     entropy_coef    = 0.01
     action_std      = 0.5           # constant std for action distribution (Multivariate Normal)
-    s_episode       = 1
+    s_episode       = 0
     #############################################
+    device = torch.device("cuda" if args.cuda else "cpu")
     #if not os.path.exists(args.checkpoint_dir):
     #    os.makedirs(args.checkpoint_dir)
     os.makedirs(args.checkpoint_dir, exist_ok=True)
@@ -225,7 +222,7 @@ if __name__ == '__main__':
     dim_acts    = env.action_space.shape[0]
 
     gamedata    = GameContent()
-    ppo         = CPPO(dim_states, dim_acts, action_std, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef)
+    ppo         = CPPO(dim_states, dim_acts, action_std, h_neurons, lr, betas, gamma, train_epochs, eps_clip, vloss_coef, entropy_coef, device)
     ppo.policy_ac.train()
 
     if args.resume:
@@ -242,7 +239,7 @@ if __name__ == '__main__':
     ts              = 0
 
     # training loop
-    for i_episode in range(s_episode, max_episodes+1):
+    for i_episode in range(s_episode+1, max_episodes+1):
         envstate = env.reset()
         for ts in range(max_timesteps):
             timestep += 1
