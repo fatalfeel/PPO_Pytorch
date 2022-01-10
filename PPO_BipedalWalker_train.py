@@ -233,14 +233,14 @@ if __name__ == '__main__':
         s_episode   = checkpoint['episode']
 
     # logging variables
+    ts              = 0
+    timestep        = 0
     running_reward  = 0
     total_length    = 0
-    timestep        = 0
-    ts              = 0
 
     # training loop
     for i_episode in range(s_episode+1, max_episodes+1):
-        envstate = env.reset()
+        envstate = env.reset() #Done-0 State-0
         for ts in range(max_timesteps):
             timestep += 1
 
@@ -252,7 +252,7 @@ if __name__ == '__main__':
 
             running_reward += reward
 
-            # Saving reward and is_terminals:
+            # one reward R(τ) = τ(a|s)R(a,s) in a certain state select an action and return the reward
             gamedata.rewards.append(reward)
 
             # is_terminal in next state:
@@ -273,33 +273,31 @@ if __name__ == '__main__':
 
         total_length += (ts+1)
 
-        if running_reward > (log_interval*solved_reward):
-            print("########## Solved! ##########")
-            avg_length  = int(total_length/log_interval)
-            avg_reward  = int((running_reward/log_interval))
-            print('Episode {} \t avg length: {} \t avg reward: {}'.format(i_episode, avg_length, avg_reward))
-            checkpoint = {'state_dict':     ppo.policy_ac.state_dict(),
-                          'optimizer_dict': ppo.optimizer.state_dict(),
-                          'episode':        i_episode}
-            lastname = args.checkpoint_dir + '/PPO_{}_last.pth'.format(env_name)
-            torch.save(checkpoint, lastname)
-            break
-
-        # logging
         if i_episode % log_interval == 0:
-            avg_length  = int(total_length/log_interval)
-            avg_reward  = int((running_reward/log_interval))
-            print('Episode {} \t avg length: {} \t avg reward: {}'.format(i_episode, avg_length, avg_reward))
-            running_reward  = 0
+            avg_length      = int(total_length/log_interval)
+            avg_reward      = int((running_reward/log_interval))
             total_length    = 0
+            running_reward  = 0
+            print('Episode {} \t avg length: {} \t avg reward: {}'.format(i_episode, avg_length, avg_reward))
+            if avg_reward > solved_reward:
+                print("########## Solved! ##########")
+                checkpoint  = {'state_dict': ppo.policy_ac.state_dict(),
+                               'optimizer_dict': ppo.optimizer.state_dict(),
+                               'episode': i_episode}
+                pname       = args.checkpoint_dir + '/PPO_{}_episode_{}.pth'.format(env_name, i_episode)
+                lastname    = args.checkpoint_dir + '/PPO_{}_last.pth'.format(env_name)
+                torch.save(checkpoint, pname)
+                torch.save(checkpoint, lastname)
+                print('save ' + pname)
+                break
 
         # save every epoch_save_freq episodes
         if i_episode % epoch_save_freq == 0:
-            checkpoint = {'state_dict':     ppo.policy_ac.state_dict(),
-                          'optimizer_dict': ppo.optimizer.state_dict(),
-                          'episode':        i_episode}
+            checkpoint  = {'state_dict':     ppo.policy_ac.state_dict(),
+                           'optimizer_dict': ppo.optimizer.state_dict(),
+                           'episode':        i_episode}
             pname       = args.checkpoint_dir + '/PPO_{}_episode_{}.pth'.format(env_name, i_episode)
-            torch.save(checkpoint, pname)
             lastname    = args.checkpoint_dir + '/PPO_{}_last.pth'.format(env_name)
+            torch.save(checkpoint, pname)
             torch.save(checkpoint, lastname)
             print('save ' + pname)
