@@ -94,7 +94,7 @@ class Actor_Critic(nn.Module):
         return epoch_actlogprobs, torch.squeeze(critic_values), entropy
 
     # if is_terminals is false use Markov formula to replace last reward
-    def GetNextValue(self, next_state, is_terminals):
+    def getNextValue(self, next_state, is_terminals):
         ''' self.returns[-1] = next_value (next_value from critic network)
             for step in reversed(range(self.rewards.size(0))):
                 self.returns[step] = self.rewards[step] + gamma * self.returns[step + 1] * self.masks[step + 1] '''
@@ -122,15 +122,15 @@ class CPPO:
         self.device         = device
 
     def train_update(self, gamedata, next_value):
-        returns             = []
-        discounted_reward   = next_value
+        returns         = []
+        discount_reward = next_value
         # Monte Carlo estimate of state rewards:
         for reward, is_terminal in zip(reversed(gamedata.rewards), reversed(gamedata.is_terminals)):
             if is_terminal:
-                discounted_reward = 0
+                discount_reward = 0
             # R(τ) = gamma^n * τ(a|s)R(a,s) , n=1~k
-            discounted_reward = reward + (self.gamma * discounted_reward)
-            returns.insert(0, discounted_reward) #always insert in the first
+            discount_reward = reward + (self.gamma * discount_reward)
+            returns.insert(0, discount_reward) #always insert in the first
 
         returns = torch.tensor(returns).double().to(self.device)
 
@@ -144,8 +144,8 @@ class CPPO:
            advantages   = rollouts.returns[:-1] - rollouts.value_preds[:-1]
            advantages   = (advantages - advantages.mean()) / (advantages.std() + 1e-5)'''
         old_values  = self.policy_ac.network_critic(old_states) #faster than do every times in interact
-        old_values  = torch.squeeze(old_values)
-        rv_diff     = returns - old_values.detach()  # A(s,a) => Q(s,a) - V(s), V(s) is critic
+        old_values  = torch.squeeze(old_values).detach()
+        rv_diff     = returns - old_values # A(s,a) => Q(s,a) - V(s), V(s) is critic
         advantages  = (rv_diff - rv_diff.mean()) / (rv_diff.std() + 1e-5)
 
         # Optimize policy for K epochs:
@@ -158,7 +158,7 @@ class CPPO:
             # ratios  = e^(State2_natureLogActProbs-Stat1_natureLogActProbs)
             # ratios  = State2_natureLogActProbs/State1_natureLogActProbs
             # ratios  = next_critic_actprobs/curr_actions_prob = Pw(A1|S2)/Pw(A1|S1), where w is weights(theta)
-            ratios  = torch.exp(epoch_actlogprobs - old_actlogprobs.detach())
+            ratios  = torch.exp(epoch_actlogprobs - old_actlogprobs)
 
             #advantages is stdscore mode
             surr1   = ratios * advantages
@@ -173,7 +173,7 @@ class CPPO:
             # value_predict_loss is (value_predict_clip - MDP-reward)^2
             # value_critic_loss is (critical predict value - MDP-reward)^2
             # value_loss is 0.5 x select max items in (predict_loss or value_critic_loss) ex: A=[2,6] b=[4,5] torch max=>[4,6]
-            value_predict_clip  = old_values.detach() + (critic_values - old_values.detach()).clamp(-self.eps_clip, self.eps_clip)
+            value_predict_clip  = old_values + (critic_values - old_values).clamp(-self.eps_clip, self.eps_clip)
             value_predict_loss  = (value_predict_clip - returns) ** 2
             value_critic_loss   = (critic_values - returns) ** 2
             value_loss          = 0.5 * torch.max(value_predict_loss, value_critic_loss)
@@ -260,7 +260,7 @@ if __name__ == '__main__':
 
             # train_update if its time
             if timestep >= update_timestep:
-                next_value = ppo.policy_ac.GetNextValue(envstate, gamedata.is_terminals[-1])
+                next_value = ppo.policy_ac.getNextValue(envstate, gamedata.is_terminals[-1])
                 ppo.train_update(gamedata, next_value)
                 gamedata.ReleaseData()
                 timestep = 0
