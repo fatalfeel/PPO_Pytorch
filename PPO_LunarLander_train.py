@@ -110,7 +110,7 @@ class Actor_Critic(nn.Module):
     #usually mini_batch_size sample < states'size do forward
     #in our example the mini_batch_size = states'size
     def calculation(self, states, actions):
-        actor_probs         = self.network_act(states) #each current with one action probility
+        actor_probs         = self.network_act(states) #each state with 4 actions probilities
         actor_probs         = torch.softmax(actor_probs, dim=-1).double()
         distribute          = torch.distributions.Categorical(actor_probs)
         epoch_actlogprobs   = distribute.log_prob(actions) #natural log prob
@@ -231,7 +231,7 @@ if __name__ == '__main__':
     ############## Hyperparameters ##############
     env_name        = "LunarLander-v2"
     render          = False
-    solved_reward   = 285           # don't change the topest avg score if more can not reach
+    solved_reward   = 295           # don't change the topest avg score if more can not reach
     h_neurons       = 1024          # number of variables in hidden layer
     max_episodes    = 200000        # max training episodes
     max_timesteps   = 500           # max timesteps in one episode
