@@ -160,7 +160,7 @@ class CPPO:
         returns = (returns - returns.mean()) / (returns.std() + 1e-5)'''
         # should modify
         # curraccu_stdscore   = (returns - returns.mean()) / (returns.std() + 1e-5) #Q(s,a)
-		# Monte Carlo estimate of state rewards:
+        # Monte Carlo estimate of state rewards
         for reward, is_terminal in zip(reversed(gamedata.rewards), reversed(gamedata.is_terminals)):
             if is_terminal:
                 discount_reward = 0
