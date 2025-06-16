@@ -124,6 +124,14 @@ class CPPO:
     def train_update(self, gamedata, next_value):
         returns         = []
         discount_reward = next_value
+
+        '''returns.mean() is E[R(τ)]
+        returns.std on torch is {1/(n-1) * Σ(x - x_average)} ** 0.5  (x ** 0.5 = x^0.5)
+        1e-5 = 0.00001 which avoid returns.std() is zero
+        (returns - average_R) / (standard_R + 0.00001) is standard score
+        returns = (returns - returns.mean()) / (returns.std() + 1e-5)'''
+        # should modify
+        # curraccu_stdscore   = (returns - returns.mean()) / (returns.std() + 1e-5) #Q(s,a)
         # Monte Carlo estimate of state rewards:
         for reward, is_terminal in zip(reversed(gamedata.rewards), reversed(gamedata.is_terminals)):
             if is_terminal:
