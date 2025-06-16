@@ -137,7 +137,7 @@ class CPPO:
             if is_terminal:
                 discount_reward = 0
             # R(τ) = gamma^n * τ(a|s)R(a,s) , n=1~k
-            discount_reward = reward + (self.gamma * discount_reward)
+            discount_reward = reward + self.gamma * discount_reward
             returns.insert(0, discount_reward) #always insert in the first
 
         returns = torch.tensor(returns).double().to(self.device)
